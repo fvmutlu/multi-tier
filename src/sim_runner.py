@@ -73,6 +73,17 @@ sim_params = test_config['sim_params']
 param_set = [params for params in namedProduct(**sim_params)]
 param_set = [params for params in filter(ignoreDudFilter, param_set)]
 
+requests_dict = {}
+print("Generating requests...")
+reqgen_begin_time = datetime.now()
+for params in param_set:
+    requests_key = (params['num_objects'], params['request_generator_seed'], params['stop_time'], params['request_rate'], params['request_dist_param'], params['request_dist_type'])
+    if requests_key in requests_dict:
+        continue
+    requests_dict[requests_key] = offlineRequestGenerator(requester_nodes, *requests_key)
+reqgen_end_time = datetime.now()
+print("Request generation complete, elapsed time: {:s}".format(str(reqgen_end_time - reqgen_begin_time)))
+
 def simRun(
     fwd_pol = 'none',
     cache_pol = 'none',
@@ -114,7 +125,7 @@ def simRun(
     fibs = assignRouting(top_graph, nodes, source_map)
     network.installFIBs(fibs)
 
-    requests = offlineRequestGenerator(request_generator_seed, requester_nodes, num_objects, stop_time, request_rate, dist_param = request_dist_param, dist_type = request_dist_type)
+    requests = requests_dict[(num_objects, request_generator_seed, stop_time, request_rate, request_dist_param, request_dist_type)]
     network.initRequests(requester_nodes, requests)
 
     env.process(network.statLogger(logging_interval))
@@ -126,6 +137,11 @@ def simRun(
 
 print("Starting simulation...")
 test_begin_time = datetime.now()
+## USE THIS NON-PARALLELIZED LOOP FOR PROFILING PURPOSES (COMMENT OUT BELOW Parallel JOB FIRST)
+#results = []
+#for params in param_set:
+#    results.append(simRun(**params))
+## USE THIS Parallel JOB FOR FASTER SIMULATIONS (COMMENT OUT ABOVE LOOP FIRST)
 results = jb.Parallel(n_jobs = args.num_cpus)(jb.delayed(simRun)(**params) for params in param_set)
 test_end_time = datetime.now()
 print("Simulation ended, elapsed time: {:s}".format(str(test_end_time - test_begin_time)))

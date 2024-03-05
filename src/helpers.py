@@ -84,7 +84,7 @@ def probDistGenerator(num_objects, dist_param = 0.75, dist_type = 'zipf'):
     if dist_type == 'zipf':
         return [zipfian.pmf(k, dist_param, num_objects) for k in range(1, num_objects + 1)]
 
-def offlineRequestGenerator(seed, nodes, num_objects, stop_time, rate, dist_param = 0.75, dist_type = 'zipf'):
+def offlineRequestGenerator(nodes, num_objects, seed, stop_time, rate, dist_param, dist_type):
     rng = default_rng(seed)
     prob_dist = probDistGenerator(num_objects, dist_param, dist_type)
     reqs = {}

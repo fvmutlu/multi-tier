@@ -129,7 +129,7 @@ dmypy.json
 .pyre/
 
 # Test config DBs
-test_configs/*.json
+test_configs/*.*
 
 # Test output DBs
-test_outputs/*.json
+test_outputs/*.*
