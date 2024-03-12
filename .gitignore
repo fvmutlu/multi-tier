@@ -128,11 +128,8 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-# Test config DBs
-test_configs/*.*
-
 # Test output DBs
-test_outputs/*.*
+sim_outputs/*.*
 
 # Math
 notebooks/*.*
