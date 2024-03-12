@@ -133,3 +133,6 @@ test_configs/*.*
 
 # Test output DBs
 test_outputs/*.*
+
+# Math
+notebooks/*.*
