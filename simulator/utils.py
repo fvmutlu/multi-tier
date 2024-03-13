@@ -4,6 +4,21 @@ import numpy as np
 # Builtin imports
 from collections import deque, defaultdict
 from itertools import product
+from datetime import timedelta
+
+def timeDiffPrinter(time_diff: timedelta) -> str:
+    hours = time_diff.seconds // 3600
+    minutes = (time_diff.seconds // 60) % 60
+    seconds = time_diff.seconds % 60
+    microseconds = time_diff.microseconds
+    time_components = []
+    if hours > 0:
+        time_components.append("{}h".format(hours))
+    if minutes > 0:
+        time_components.append("{}m".format(minutes))
+    time_components.append("{}.{}s".format(seconds, microseconds))
+    formatted_time_diff = " ".join(time_components)
+    return formatted_time_diff
 
 def namedProduct(**items: dict):
     """

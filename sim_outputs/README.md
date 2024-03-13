@@ -1,0 +1,1 @@
+This is the directory where data collected from simulation runs (.json), as well as logs (.txt) will be placed.

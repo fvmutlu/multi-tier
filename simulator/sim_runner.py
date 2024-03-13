@@ -1,30 +1,42 @@
-import argparse
+# External package imports
 import numpy as np
 import simpy as sp
 import joblib as jb
 import networkx as nx
-
-from urllib.request import urlopen
-import json
-
 from tinydb import TinyDB
+
+# Builtin imports
+import argparse
+import json
+import logging
 from itertools import product
 from datetime import datetime
+from time import localtime
+from urllib.request import urlopen
 
+# Internal imports
 from .topologies import topologies, getRandomTopology
 from .network import getNetwork
 from .helpers import assignSources, assignRouting, offlineRequestGenerator, ignoreDudFilter
-from .utils import namedProduct, namedZip
+from .utils import namedProduct, namedZip, timeDiffPrinter
 
+# Argument parsing
 parser = argparse.ArgumentParser()
-parser.add_argument('-n', '--test_name', type = str)
-parser.add_argument('-t', '--topology', type = str)
-parser.add_argument('-d', '--database_name', type = str)
+parser.add_argument('--experiment_name', type = str)
+parser.add_argument('--topology', type = str)
 parser.add_argument('-c', '--num_cpus', type = int)
+parser.add_argument('--loglevel', type = str, default = "ERROR")
 config_mutex_group = parser.add_mutually_exclusive_group()
-config_mutex_group.add_argument('-p', '--config_path', type = str)
-config_mutex_group.add_argument('-u', '--config_url', type = str)
+config_mutex_group.add_argument('--config_path', type = str)
+config_mutex_group.add_argument('--config_url', type = str)
 args = parser.parse_args()
+
+numeric_log_level = getattr(logging, args.loglevel.upper(), None)
+logging.basicConfig(filename = './sim_outputs/' + args.experiment_name + '_log.txt',
+                    filemode = 'w',
+                    format = '[%(asctime)s] %(levelname)s : %(message)s',
+                    datefmt = '%Y-%m-%d %H:%M:%S',
+                    level = numeric_log_level)
 
 if args.config_url:
     response = urlopen(args.config_url)
@@ -33,7 +45,7 @@ elif args.config_path:
     config_file = open(args.config_path, 'r')
     test_config = json.loads(config_file.read())
 
-print("Config read, setting up for simulation...")
+logging.info("Config read, setting up simulation.")
 
 top_params = topologies[args.topology]
 if top_params['fixed']:
@@ -80,16 +92,18 @@ sim_params = test_config['sim_params']
 param_set = [params for params in namedProduct(**sim_params)]
 param_set = [params for params in filter(ignoreDudFilter, param_set)]
 
-requests_dict = {}
-print("Generating requests...")
+logging.info("Setup complete, generating requests.")
 reqgen_begin_time = datetime.now()
+
+requests_dict = {}
 for params in param_set:
     requests_key = (params['num_objects'], params['request_generator_seed'], params['stop_time'], params['request_rate'], params['request_dist_param'], params['request_dist_type'])
     if requests_key in requests_dict:
         continue
     requests_dict[requests_key] = offlineRequestGenerator(requester_nodes, *requests_key)
+
 reqgen_end_time = datetime.now()
-print("Request generation complete, elapsed time: {:s}".format(str(reqgen_end_time - reqgen_begin_time)))
+logging.info("Request generation complete, elapsed time: {:s}".format(timeDiffPrinter(reqgen_end_time - reqgen_begin_time)))
 
 def simRun(
     fwd_pol = 'none',
@@ -142,30 +156,31 @@ def simRun(
     return network.getStats()
 
 
-print("Starting simulation...")
+logging.info("Starting simulation run.")
 test_begin_time = datetime.now()
+
 ## USE THIS NON-PARALLELIZED LOOP FOR PROFILING PURPOSES (COMMENT OUT BELOW Parallel JOB FIRST)
 #results = []
 #for params in param_set:
 #    results.append(simRun(**params))
 ## USE THIS Parallel JOB FOR FASTER SIMULATIONS (COMMENT OUT ABOVE LOOP FIRST)
 results = jb.Parallel(n_jobs = args.num_cpus)(jb.delayed(simRun)(**params) for params in param_set)
-test_end_time = datetime.now()
-print("Simulation ended, elapsed time: {:s}".format(str(test_end_time - test_begin_time)))
 
-print("Inserting data into DB...")
+test_end_time = datetime.now()
+logging.info("Simulation run complete, elapsed time: {:s}".format(timeDiffPrinter(test_end_time - test_begin_time)))
+
+logging.info("Inserting data into DB.")
 tic = datetime.now()
 
 test_db = TinyDB('./sim_outputs/test_configs.json')
-test_db.insert({'test': args.test_name, 'time': str(test_begin_time), 'topology': args.topology, 'elapsed': str(test_end_time - test_begin_time), **test_config})
-
+test_db.insert({'test': args.experiment_name, 'time': str(test_begin_time), 'topology': args.topology, 'elapsed': str(test_end_time - test_begin_time), **test_config})
 data_rows = []
 for i, params in enumerate(param_set): # Per param set
     for res in results[i]: # Per log interval
         data_rows.append({**params, **res})
         
-data_db = TinyDB('./sim_outputs/' + args.database_name + '.json')
-data_db.insert({'test': args.test_name, 'time': str(test_begin_time), 'topology': args.topology, 'elapsed': str(test_end_time - test_begin_time), 'data': data_rows})
+data_db = TinyDB('./sim_outputs/' + args.experiment_name + '_db.json')
+data_db.insert({'test': args.experiment_name, 'time': str(test_begin_time), 'topology': args.topology, 'elapsed': str(test_end_time - test_begin_time), 'data': data_rows})
 
 toc = datetime.now()
-print("Insertion done in {:s}, exiting.".format(str(toc-tic)))
+logging.info("Data insertion complete, elapsed time: {:s}.".format(timeDiffPrinter(toc-tic)))
