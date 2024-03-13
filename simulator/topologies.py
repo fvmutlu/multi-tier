@@ -1,5 +1,11 @@
+# External package imports
 import numpy as np
 import networkx as nx
+
+# Builtin imports
+
+# Internal imports
+
 topologies = {
     "service": {
         "fixed": True,

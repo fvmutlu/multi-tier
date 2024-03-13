@@ -1,10 +1,13 @@
+# External package imports
 from numpy import arange
 from numpy.random import default_rng
 from scipy.stats import zipfian
-from collections import defaultdict, deque
-from itertools import product
 import networkx as nx
 
+# Builtin imports
+from collections import defaultdict
+
+# Internal imports
 from .policies import *
 
 def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):

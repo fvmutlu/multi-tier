@@ -1,8 +1,11 @@
+# External package imports
 import numpy as np
 
+# Builtin imports
 from collections import deque
 
-from .node import Node, IANode
+# Internal imports
+from .node import Node
 from .utils import wique
 
 class RoundRobinNode(Node):

@@ -6,7 +6,21 @@ from collections import deque, defaultdict
 from itertools import product
 from datetime import timedelta
 
-def timeDiffPrinter(time_diff: timedelta) -> str:
+def timeDiffPrinter(time_diff: timedelta):
+    """
+    Convert a timedelta object into a formatted string representation of time difference.
+
+    Args:
+        time_diff (timedelta): The time difference to be converted.
+
+    Returns:
+        str: A formatted string representing the time difference in hours, minutes, seconds, and microseconds.
+
+    Example:
+        >>> time_diff = timedelta(hours=2, minutes=30, seconds=15, microseconds=500000)
+        >>> timeDiffPrinter(time_diff)
+        '2h 30m 15.500000s'
+    """
     hours = time_diff.seconds // 3600
     minutes = (time_diff.seconds // 60) % 60
     seconds = time_diff.seconds % 60
@@ -129,7 +143,7 @@ class wique:
         __init__(self, maxlen=10): Initializes the wique object with a specified maximum length.
         append(self, x): Adds a new element to the window, updating mean and sum accordingly.
     """
-    def __init__(self, maxlen = 10):
+    def __init__(self, maxlen: int = 10):
         """
         Initializes a wique object with a specified maximum length.
 
@@ -142,7 +156,7 @@ class wique:
         self.mean = 0
         self.sum = 0
 
-    def append(self, x):
+    def append(self, x: int) -> None:
         """
         Adds a new element to the window, updating mean and sum accordingly.
 

@@ -1,7 +1,10 @@
+# External package imports
 import simpy as sp
 
+# Builtin imports
 from copy import deepcopy
 
+# Internal imports
 from .link import getLink, getCtrlLink
 from .cache import Permastore, Cache
 from .helpers import getNode

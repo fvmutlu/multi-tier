@@ -1,5 +1,9 @@
+# External package imports
 import numpy as np
 
+# Builtin imports
+
+# Internal imports
 from .node import Node
 from .utils import wique
 

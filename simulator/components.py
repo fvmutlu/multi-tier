@@ -1,5 +1,5 @@
+# External package imports
 import simpy as sp
-from collections import namedtuple
 
 class Request(object):
     def __init__(self, env, origin_id, seq_id, object_id):
