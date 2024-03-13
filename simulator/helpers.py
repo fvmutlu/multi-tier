@@ -5,7 +5,7 @@ from collections import defaultdict, deque
 from itertools import product
 import networkx as nx
 
-from policies import *
+from .policies import *
 
 def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
     if fwd_pol == 'none':

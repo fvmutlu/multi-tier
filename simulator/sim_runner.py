@@ -11,10 +11,10 @@ from tinydb import TinyDB
 from itertools import product
 from datetime import datetime
 
-from topologies import topologies, getRandomTopology
-from network import getNetwork
-from helpers import assignSources, assignRouting, offlineRequestGenerator, ignoreDudFilter
-from utils import namedProduct, namedZip
+from .topologies import topologies, getRandomTopology
+from .network import getNetwork
+from .helpers import assignSources, assignRouting, offlineRequestGenerator, ignoreDudFilter
+from .utils import namedProduct, namedZip
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-n', '--test_name', type = str)
@@ -149,7 +149,7 @@ print("Simulation ended, elapsed time: {:s}".format(str(test_end_time - test_beg
 print("Inserting data into DB...")
 tic = datetime.now()
 
-test_db = TinyDB('./test_outputs/test_configs.json')
+test_db = TinyDB('./sim_outputs/test_configs.json')
 test_db.insert({'test': args.test_name, 'time': str(test_begin_time), 'topology': args.topology, 'elapsed': str(test_end_time - test_begin_time), **test_config})
 
 data_rows = []
@@ -157,7 +157,7 @@ for i, params in enumerate(param_set): # Per param set
     for res in results[i]: # Per log interval
         data_rows.append({**params, **res})
         
-data_db = TinyDB('./test_outputs/' + args.database_name + '.json')
+data_db = TinyDB('./sim_outputs/' + args.database_name + '.json')
 data_db.insert({'test': args.test_name, 'time': str(test_begin_time), 'topology': args.topology, 'elapsed': str(test_end_time - test_begin_time), 'data': data_rows})
 
 toc = datetime.now()

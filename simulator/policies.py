@@ -2,10 +2,10 @@ import numpy as np
 from scipy.optimize import linear_sum_assignment
 from collections import defaultdict
 
-from caching_policies import *
-from forwarding_policies import *
+from .caching_policies import *
+from .forwarding_policies import *
 
-from utils import wique, invertDict, randargmax
+from .utils import wique, invertDict, randargmax
 
 class RRLRUNode(RoundRobinNode, LRUNode):
     def __init__(self, env, node_id, num_objects):

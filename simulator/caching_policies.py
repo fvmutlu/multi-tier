@@ -1,7 +1,7 @@
 import numpy as np
 
-from node import Node
-from utils import wique
+from .node import Node
+from .utils import wique
 
 class LRUNode(Node):
     def lruInit(self, num_objects):

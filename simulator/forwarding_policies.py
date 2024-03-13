@@ -2,8 +2,8 @@ import numpy as np
 
 from collections import deque
 
-from node import Node, IANode
-from utils import wique
+from .node import Node, IANode
+from .utils import wique
 
 class RoundRobinNode(Node):
     def addFIB(self, fib):

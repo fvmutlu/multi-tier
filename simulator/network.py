@@ -2,10 +2,9 @@ import simpy as sp
 
 from copy import deepcopy
 
-from link import getLink, getCtrlLink
-from cache import Permastore, Cache
-
-from helpers import getNode
+from .link import getLink, getCtrlLink
+from .cache import Permastore, Cache
+from .helpers import getNode
 
 class Network(object):
     def __init__(self, env):
