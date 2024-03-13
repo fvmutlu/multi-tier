@@ -18,14 +18,21 @@ from .utils import namedProduct, namedZip
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-n', '--test_name', type = str)
-parser.add_argument('-u', '--test_url', type = str)
 parser.add_argument('-t', '--topology', type = str)
 parser.add_argument('-d', '--database_name', type = str)
 parser.add_argument('-c', '--num_cpus', type = int)
+config_mutex_group = parser.add_mutually_exclusive_group()
+config_mutex_group.add_argument('-p', '--config_path', type = str)
+config_mutex_group.add_argument('-u', '--config_url', type = str)
 args = parser.parse_args()
 
-response = urlopen(args.test_url)
-test_config = json.loads(response.read())
+if args.config_url:
+    response = urlopen(args.config_url)
+    test_config = json.loads(response.read())
+elif args.config_path:
+    config_file = open(args.config_path, 'r')
+    test_config = json.loads(config_file.read())
+
 print("Config read, setting up for simulation...")
 
 top_params = topologies[args.topology]

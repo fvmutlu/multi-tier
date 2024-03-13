@@ -130,6 +130,8 @@ dmypy.json
 
 # Test output DBs
 sim_outputs/*.*
+sim_configs/*
+!sim_configs/sample_config.json
 
 # Math
 notebooks/*.*
