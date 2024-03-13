@@ -1,4 +1,9 @@
+# External package imports
 import simpy as sp
+
+# Builtin imports
+
+# Internal imports
 
 class Link(object):
     def __init__(self, env, link_cap, prop_delay):

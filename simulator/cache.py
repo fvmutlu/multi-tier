@@ -1,4 +1,7 @@
+# External package imports
 import simpy as sp
+
+# Builtin imports
 from collections import namedtuple
 
 class Permastore(object):

@@ -1,7 +1,14 @@
-from collections import namedtuple, defaultdict
-from components import Request, InterestPacket, DataPacket
-from copy import deepcopy
+# External package imports
 import simpy as sp
+
+# Builtin imports
+from collections import namedtuple, defaultdict
+from copy import deepcopy
+
+# Internal imports
+from .components import Request, InterestPacket, DataPacket
+from .cache import Cache, Permastore
+from .link import Link
 
 Packet = namedtuple('Packet',['type', 'object_id'])
 
@@ -13,7 +20,7 @@ class Node(object):
     However, it makes no assumptions for forwarding or caching strategies.
     Those functions must be implemented by inheriting classes that define custom forwarding and caching.
     """
-    def __init__(self, env, node_id):
+    def __init__(self, env: sp.Environment, node_id: int):
         # SimPy environment
         self.env = env
 
@@ -62,7 +69,7 @@ class Node(object):
                      }
         self.stat_logs = {}
                 
-    def addOutputLink(self, remote_id, link, ctrl_link):
+    def addOutputLink(self, remote_id: int, link: Link, ctrl_link: Link):
         """
         Add an output link to the node.
         """

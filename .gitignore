@@ -129,7 +129,11 @@ dmypy.json
 .pyre/
 
 # Test output DBs
-sim_outputs/*.*
+sim_outputs/*
+!sim_outputs/README.md
+sim_configs/*
+!sim_configs/README.md
+!sim_configs/sample_config.json
 
 # Math
-notebooks/*.*
+notebooks/*

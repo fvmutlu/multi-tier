@@ -1,7 +1,11 @@
+# External package imports
 import numpy as np
 
-from node import Node
-from utils import wique
+# Builtin imports
+
+# Internal imports
+from .node import Node
+from .utils import wique
 
 class LRUNode(Node):
     def lruInit(self, num_objects):

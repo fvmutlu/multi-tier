@@ -1,11 +1,13 @@
+# External package imports
 import simpy as sp
 
+# Builtin imports
 from copy import deepcopy
 
-from link import getLink, getCtrlLink
-from cache import Permastore, Cache
-
-from helpers import getNode
+# Internal imports
+from .link import getLink, getCtrlLink
+from .cache import Permastore, Cache
+from .helpers import getNode
 
 class Network(object):
     def __init__(self, env):

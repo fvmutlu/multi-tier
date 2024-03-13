@@ -1,0 +1,26 @@
+{
+    "description": "A sample test config file",
+    "logging_interval": 100000,
+    "sim_params":
+    {
+        "fwd_pol"                : ["lrt","mvip"],
+        "cache_pol"              : ["lru","lfu","mvip"],
+        "num_objects"            : [1000],
+        "source_read_rate"       : [1000],
+        "source_map_seed"        : [1],
+        "request_generator_seed" : [1],
+        "stop_time"              : [100],
+        "request_rate"           : [5],
+        "request_dist_param"     : [0.75],
+        "request_dist_type"      : ["zipf"],
+        "pen_weight"             : [0],
+        "vip_inc"                : [1],
+        "vip_slot_len"           : [1],
+        "vip_win_size"           : [100],
+        "cache_capacities"       : [[5,100]],
+        "cache_read_rates"       : [[20,10]],
+        "cache_write_rates"      : [[20,10]],
+        "cache_read_pens"        : [[2,1]],
+        "cache_write_pens"       : [[4,2]]
+    }
+}
