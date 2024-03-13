@@ -18,8 +18,7 @@ class LRUNode(Node):
     def decideCaching(self, object_id):
         for cache in self.caches:
             if cache.isFull():
-                tier_lru_table = [self.lru_table[k] for k in cache.contents]
-                victim_id = cache.contents[np.argmin(tier_lru_table)]
+                victim_id = min(cache.contents, key=lambda k: self.lru_table[k])
                 if self.lru_table[object_id] > self.lru_table[victim_id]:
                     yield self.env.process(cache.replaceObject(victim_id, object_id))
                     object_id = victim_id
@@ -38,8 +37,7 @@ class LFUNode(Node):
     def decideCaching(self, object_id):
         for j, cache in enumerate(self.caches):
             if cache.isFull():
-                tier_lfu_table = [self.lfu_table[k] for k in cache.contents]
-                victim_id = cache.contents[np.argmin(tier_lfu_table)]
+                victim_id = min(cache.contents, key=lambda k: self.lfu_table[k])
                 if self.lfu_table[object_id] > self.lfu_table[victim_id]:
                     yield self.env.process(cache.replaceObject(victim_id, object_id))
                     object_id = victim_id
@@ -66,6 +64,7 @@ class WLFUNode(Node):
                 self.lfu_counters[k] = 0
                 self.lfu_table[k] = self.lfu_windows[k].mean
 
+# TODO: FIFO, UNIF (and potentially LRU) cache.contents have not yet been changed to work as sets, since they are better implemented as different data structures
 class FIFONode(Node):
     def decideCaching(self, object_id):
         for cache in self.caches:
@@ -99,8 +98,7 @@ class PALFUNode(LFUNode):
             p_rj = self.pw * cache.read_penalty
             p_wj = self.pw * cache.write_penalty
             if cache.isFull():
-                tier_lfu_table = [self.lfu_table[k] for k in cache.contents]
-                victim_id = cache.contents[np.argmin(tier_lfu_table)]
+                victim_id = min(cache.contents, key=lambda k: self.lfu_table[k])
                 benefit = r_nj * (self.lfu_table[object_id] - self.lfu_table[victim_id]) - (p_rj + p_wj)
                 benefits.append(benefit)
                 victims.append(victim_id)

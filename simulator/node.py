@@ -258,7 +258,6 @@ class Node(object):
             self.stats['source_hits'] = source_stats['reads']
             self.stats['source_hit_delay'] = source_stats['read_delay']
         if self.has_caches:
-            # Contents currently not tracked since the format is not JSON serializable
             self.stats['cache_hits']            = []
             self.stats['cache_writes']          = []
             self.stats['cache_replacements']    = []

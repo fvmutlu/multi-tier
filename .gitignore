@@ -137,3 +137,6 @@ sim_configs/*
 
 # Math
 notebooks/*
+
+# Profiling
+*.prof

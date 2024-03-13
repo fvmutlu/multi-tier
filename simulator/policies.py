@@ -155,8 +155,7 @@ class VIPNode(Node):
         victims = []
         for j, cache in enumerate(self.caches):
             if cache.isFull():
-                tier_scores = [self.cache_scores[k] for k in cache.contents]
-                victim_id = cache.contents[np.argmin(tier_scores)]
+                victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
                 benefits.append(cache.read_rate*(self.cache_scores[object_id] - self.cache_scores[victim_id]) - self.pw * (cache.read_penalty + cache.write_penalty))
                 victims.append(victim_id)
             else:
@@ -173,8 +172,7 @@ class VIPNode(Node):
     def decideCaching_OG(self, object_id):
         for cache in self.caches:
             if cache.isFull():
-                tier_scores = [self.cache_scores[k] for k in cache.contents]
-                victim_id = cache.contents[np.argmin(tier_scores)]
+                victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
                 if self.cache_scores[object_id] > self.cache_scores[victim_id]:
                     yield self.env.process(cache.replaceObject(victim_id,object_id))
                     object_id = victim_id
@@ -221,7 +219,7 @@ class VIPNode(Node):
             
             # Set VIP counts to 0 for all sourced objects
             if self.is_source:
-                for k in self.permastore.getContents():
+                for k in self.permastore.contents:
                     self.vip_counts[k] = 0
 
             # Determine virtual plane forwarding
@@ -283,8 +281,7 @@ class MVIPNode(VIPNode):
         victims = []
         for j, cache in enumerate(self.caches):
             if cache.isFull():
-                tier_scores = [self.cache_scores[k] for k in cache.contents]
-                victim_id = cache.contents[np.argmin(tier_scores)]
+                victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
                 benefits.append(cache.read_rate*(self.cache_scores[object_id] - self.cache_scores[victim_id]) - self.pw * (cache.read_penalty + cache.write_penalty))
                 victims.append(victim_id)
             else:
@@ -372,7 +369,7 @@ class MVIPNode(VIPNode):
             
             # Set VIP counts to 0 for all sourced objects
             if self.is_source:
-                for k in self.permastore.getContents():
+                for k in self.permastore.contents:
                     self.vip_counts[k] = 0
 
             # Determine virtual plane caching

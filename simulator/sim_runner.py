@@ -26,6 +26,7 @@ parser.add_argument('--experiment_name', type = str)
 parser.add_argument('--topology', type = str)
 parser.add_argument('-c', '--num_cpus', type = int)
 parser.add_argument('--loglevel', type = str, default = "ERROR")
+parser.add_argument('--profiling', action = argparse.BooleanOptionalAction)
 config_mutex_group = parser.add_mutually_exclusive_group()
 config_mutex_group.add_argument('--config_path', type = str)
 config_mutex_group.add_argument('--config_url', type = str)
@@ -164,7 +165,12 @@ test_begin_time = datetime.now()
 #for params in param_set:
 #    results.append(simRun(**params))
 ## USE THIS Parallel JOB FOR FASTER SIMULATIONS (COMMENT OUT ABOVE LOOP FIRST)
-results = jb.Parallel(n_jobs = args.num_cpus)(jb.delayed(simRun)(**params) for params in param_set)
+if args.profiling:
+    results = []
+    for params in param_set:
+        results.append(simRun(**params))
+else:
+    results = jb.Parallel(n_jobs = args.num_cpus)(jb.delayed(simRun)(**params) for params in param_set)
 
 test_end_time = datetime.now()
 logging.info("Simulation run complete, elapsed time: {:s}".format(timeDiffPrinter(test_end_time - test_begin_time)))
