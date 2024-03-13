@@ -172,15 +172,12 @@ logging.info("Simulation run complete, elapsed time: {:s}".format(timeDiffPrinte
 logging.info("Inserting data into DB.")
 tic = datetime.now()
 
-test_db = TinyDB('./sim_outputs/test_configs.json')
-test_db.insert({'test': args.experiment_name, 'time': str(test_begin_time), 'topology': args.topology, 'elapsed': str(test_end_time - test_begin_time), **test_config})
 data_rows = []
 for i, params in enumerate(param_set): # Per param set
     for res in results[i]: # Per log interval
-        data_rows.append({**params, **res})
-        
+        data_rows.append({**params, **res})    
 data_db = TinyDB('./sim_outputs/' + args.experiment_name + '_db.json')
-data_db.insert({'test': args.experiment_name, 'time': str(test_begin_time), 'topology': args.topology, 'elapsed': str(test_end_time - test_begin_time), 'data': data_rows})
+data_db.insert({'experiment_name': args.experiment_name, 'topology': args.topology, 'elapse_real_time': str(test_end_time - test_begin_time), 'data': data_rows})
 
 toc = datetime.now()
 logging.info("Data insertion complete, elapsed time: {:s}.".format(timeDiffPrinter(toc-tic)))
