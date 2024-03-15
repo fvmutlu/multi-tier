@@ -355,11 +355,9 @@ class MVIPNode(VIPNode):
         
         # Run LSAP. Rows are cache spaces, columns are object ids.
         row_ind, col_ind  = linear_sum_assignment(cost_matrix, maximize = True)
-        #row_ind, col_ind  = linear_sum_assignment(cost_matrix, maximize = True)
         
         # Reset virtual object locs
         self.virtual_object_locs = resetDict(self.virtual_object_locs, -2)
-        #self.virtual_object_locs = [-2] * self.num_objects
         
         # Clear virtual caches
         for v_cache in self.virtual_caches:
