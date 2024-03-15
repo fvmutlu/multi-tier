@@ -11,7 +11,7 @@ from collections import defaultdict
 from .caching_policies import *
 from .forwarding_policies import *
 
-from .utils import wique, invertDict, randargmax
+from .utils import wique, invertDict, resetDict
 
 class RRLRUNode(RoundRobinNode, LRUNode):
     def __init__(self, env, node_id, num_objects):
@@ -271,10 +271,18 @@ class VIPNode(Node):
 class MVIPNode(VIPNode):
     def __init__(self, env, node_id, num_objects, pen_weight, **vip_args):
         super().__init__(env, node_id, num_objects, pen_weight, **vip_args)
-        self.virtual_object_locs = [-2] * num_objects
-
-    def locateObjectVirtual(self, object_id):
-        return self.virtual_object_locs[object_id]
+        self.virtual_object_locs = {key : -2 for key in range(num_objects)}
+        self.tier_mapping, self.tier_slices = [], []
+    
+    def addCache(self, cache):
+        super().addCache(cache)
+        self.tier_mapping += [len(self.caches)-1] * cache.capacity
+        if self.tier_slices:
+            end_of_last_slice = self.tier_slices[-1].stop
+            new_slice = slice(end_of_last_slice, end_of_last_slice + cache.capacity)
+        else:
+            new_slice = slice(0, cache.capacity)
+        self.tier_slices.append(new_slice)
 
     def decideCaching(self, object_id):
         benefits = []
@@ -313,24 +321,20 @@ class MVIPNode(VIPNode):
         return vip_alloc
 
     def vipCaching(self):
-        cache_sizes, r_nj, p_rj, p_wj = [], [], [], []
+        r_nj, p_rj, p_wj = [], [], []
+        total_cache_size = 0
         for cache in self.caches:
-            cache_sizes.append(cache.capacity)
+            total_cache_size += cache.capacity
             r_nj.append(cache.read_rate)
             p_rj.append(cache.read_penalty)
             p_wj.append(cache.write_penalty)
         
-        total_cache_size = sum(cache_sizes)
-        # Initialize cost matrix, with shape k x J
-        cost_matrix = np.zeros((self.num_objects, total_cache_size))
-        
-        # Determine last index of each cache for cache space to cache tier mapping
-        cache_ranges = np.cumsum(cache_sizes)
-        tier_mapping = np.zeros(total_cache_size, dtype=int)
+        # Initialize cost matrix, with shape J x k
+        cost_matrix = np.zeros((total_cache_size, self.num_objects))
 
         for k in range(self.num_objects):
             # Locate object
-            object_loc = self.locateObjectVirtual(k)
+            object_loc = self.virtual_object_locs[k]
             # Update cache scores
             if object_loc == -1:
                 self.cache_scores[k] = 0
@@ -339,28 +343,34 @@ class MVIPNode(VIPNode):
             
             cs_k = self.cache_scores[k]
             for j in range(len(self.caches)):
-                cache_slice = slice(cache_ranges[j] - cache_sizes[j], cache_ranges[j])
-                tier_mapping[cache_slice] = j
+                tier_slice = self.tier_slices[j]
+                # TODO: penalty weights were missing here, investigate why
                 if object_loc == j:
-                    cost_matrix[k, cache_slice] = r_nj[j] * cs_k + p_rj[j]
+                    cost_matrix[tier_slice, k] = r_nj[j] * cs_k + self.pw * p_rj[j]
                 else:
-                    cost_matrix[k, cache_slice] = r_nj[j] * cs_k - p_wj[j]
+                    cost_matrix[tier_slice, k] = r_nj[j] * cs_k - self.pw * p_wj[j]
 
         # Round small values to zero
         cost_matrix[np.abs(cost_matrix) < 1e-6] = 0
-        # Run RAP algorithm (LSAP with modified Jonker-Volgenant for rectangular matrices)
+        
+        # Run LSAP. Rows are cache spaces, columns are object ids.
         row_ind, col_ind  = linear_sum_assignment(cost_matrix, maximize = True)
-        # Update virtual object locs
-        self.virtual_object_locs = [-2] * self.num_objects
+        #row_ind, col_ind  = linear_sum_assignment(cost_matrix, maximize = True)
+        
+        # Reset virtual object locs
+        self.virtual_object_locs = resetDict(self.virtual_object_locs, -2)
+        #self.virtual_object_locs = [-2] * self.num_objects
+        
         # Clear virtual caches
         for v_cache in self.virtual_caches:
             v_cache.clear()
         
-        for k, i in zip(row_ind, col_ind):
-            if cost_matrix[k][i] >= 0:
-                v_cache = self.virtual_caches[tier_mapping[i]]
+        # Assign objects to virtual cache
+        for i, k in zip(row_ind, col_ind):
+            if cost_matrix[i][k] >= 0:
+                v_cache = self.virtual_caches[self.tier_mapping[i]]
                 v_cache.append(k)
-                self.virtual_object_locs[k] = tier_mapping[i]
+                self.virtual_object_locs[k] = self.tier_mapping[i]
 
     def vipProcess(self):
         while True:

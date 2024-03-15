@@ -106,6 +106,26 @@ def invertDict(input_dict: dict):
             new_dict[item].append(key)
     return dict(new_dict)
 
+def resetDict(input_dict: dict, default_value):
+    """
+    Resets the values in a dictionary to a given default value.
+
+    Args:
+        input_dict: The input dictionary to be reset.
+        default_value: Default value to reset every value in the dictionary to.
+    
+    Returns:
+        dict: A new dictionary with the same keys as those of input_dict
+              but all values equal to default_value.
+    
+    Example:
+    >>> input_dict = {'a': 5, 'b': 12}
+    {'a': 5, 'b': 12}
+    >>> resetDict(input_dict, 0)
+    {'a': 0, 'b': 0}
+    """
+    return input_dict.fromkeys(input_dict, default_value)
+
 def randargmax(arr: np.ndarray, axis: int, seed: int = 1):
     """
     Return the indices of the maximum values along an axis of a numpy array, randomly choosing among ties.
