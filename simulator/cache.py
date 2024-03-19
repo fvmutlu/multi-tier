@@ -43,7 +43,7 @@ class Permastore(object):
         return obj
         
     def getStats(self):
-        return {**self.stats}
+        return self.stats
 
 CacheTask = namedtuple('CacheTask', ['type', 'object_id'])
 
@@ -140,4 +140,4 @@ class Cache(object):
             raise IndexError(f"Object {evicted_object_id} not in cache.")
     
     def getStats(self):
-        return self.stats.copy()
+        return self.stats

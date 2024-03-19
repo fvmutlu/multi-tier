@@ -62,34 +62,38 @@ else:
     
 nodes = list(range(num_nodes))
 
+# Set source nodes
 if top_params['source_nodes']:
     sources = top_params['source_nodes']
 else:
     sources = nodes
 
+# Set caching nodes
 if top_params['cache_nodes']:
     cache_nodes = top_params['cache_nodes']
 else:
     cache_nodes = nodes
 
+# Set requester nodes
 if top_params['requester_nodes']:
     requester_nodes = top_params['requester_nodes']
 else:
     requester_nodes = nodes
 
+# Set link capacities
 if isinstance(top_params['link_caps'], (int,float)):
     link_caps = np.empty_like(adj_mat)
     link_caps[np.where(adj_mat != 0)] = top_params['link_caps']
 else:
     link_caps = top_params['link_caps']
 
+# Build links
 links = []
 for v, u in product(nodes,nodes):
     if adj_mat[v][u] != 0:
         link = {'edge': (v, u), 'cap': link_caps[v][u], 'prop_delay': 0, 'ctrl_args': {}}
         links.append(link)
 
-logging_interval = test_config['logging_interval']
 sim_params = test_config['sim_params']
 param_set = [params for params in namedProduct(**sim_params)]
 param_set = [params for params in filter(ignoreDudFilter, param_set)]
@@ -156,8 +160,6 @@ def simRun(
 
     requests = requests_dict[(num_objects, request_generator_seed, stop_time, request_rate, request_dist_param, request_dist_type)]
     network.initRequests(requester_nodes, requests)
-
-    env.process(network.statLogger(logging_interval))
 
     termination_watcher = env.process(network.terminateSim(requester_nodes))
     env.run(until = termination_watcher)
