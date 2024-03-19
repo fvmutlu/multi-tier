@@ -126,6 +126,22 @@ def resetDict(input_dict: dict, default_value):
     """
     return input_dict.fromkeys(input_dict, default_value)
 
+def convertListFieldsToTuples(dictionary):
+    """
+    Converts list fields in a dictionary to tuples.
+
+    Args:
+        dictionary (dict): The dictionary to be processed.
+
+    Returns:
+        dict: The dictionary with list fields converted to tuples.
+    """
+    for key, value in dictionary.items():
+        if isinstance(value, list):
+            # Convert the list to a tuple
+            dictionary[key] = tuple(value)
+    return dictionary
+
 def randargmax(arr: np.ndarray, axis: int, seed: int = 1):
     """
     Return the indices of the maximum values along an axis of a numpy array, randomly choosing among ties.

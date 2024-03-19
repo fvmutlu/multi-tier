@@ -17,7 +17,12 @@ from urllib.request import urlopen
 # Internal imports
 from .topologies import topologies, getRandomTopology
 from .network import getNetwork
-from .helpers import assignSources, assignRouting, offlineRequestGenerator, ignoreDudFilter
+from .helpers import (
+    assignSources,
+    assignRouting,
+    offlineRequestGenerator,
+    ignoreDudFilter
+)
 from .utils import namedProduct, namedZip, timeDiffPrinter
 
 # Argument parsing

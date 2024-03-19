@@ -6,63 +6,91 @@ import networkx as nx
 
 # Builtin imports
 from collections import defaultdict
+from dataclasses import dataclass
+from typing import Tuple
 
 # Internal imports
 from .policies import *
+from .utils import convertListFieldsToTuples, namedProduct
+
+@dataclass
+class SimulationParameters:
+    fwd_pol: str = 'none'
+    cache_pol: str = 'none'
+    num_objects: int = 1000
+    source_read_rate: int = 1000
+    source_map_seed: int = 1
+    request_generator_seed: int = 1
+    stop_time: int = 100
+    request_rate: int = 10
+    request_dist_param: float = 0.75
+    request_dist_type: str = 'zipf'
+    pen_weight: int = 0
+    vip_inc: int = 1
+    vip_slot_len: int = 1
+    vip_win_size: int = 30
+    cache_capacities: Tuple[int] = (10, 100)
+    cache_read_rates: Tuple[int] = (20, 10)
+    cache_write_rates: Tuple[int] = (20, 10)
+    cache_read_pens: Tuple[int] = (2, 1)
+
+def simConfigToParamSets(config):
+    param_sets = [params for params in namedProduct(**config)]
+    param_sets = [params for params in filter(ignoreDudFilter, param_sets)]
+    param_sets = [convertListFieldsToTuples(params) for params in param_sets]
+    param_sets = [SimulationParameters(**params) for params in param_sets]
 
 def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
-    if fwd_pol == 'none':
-        if cache_pol == 'none':
+    match fwd_pol, cache_pol:
+        case 'none', 'none':
             return Node(env, node_id)
-        elif cache_pol == 'lru':
+        case 'none', 'lru':
             return LRUNode(env, node_id, kwargs['num_objects'])
-        elif cache_pol == 'lfu':
+        case 'none', 'lfu':
             return LFUNode(env, node_id, kwargs['num_objects'])
-        elif cache_pol == 'wlfu':
+        case 'none', 'wlfu':
             return WLFUNode(env, node_id, kwargs['num_objects'])
-        elif cache_pol == 'fifo':
+        case 'none', 'fifo':
             return FIFONode(env, node_id)
-        elif cache_pol == 'unif':
+        case 'none', 'unif':
             return UNIFNode(env, node_id)
-        elif cache_pol == 'palfu':
+        case 'none', 'palfu':
             return PALFUNode(env, node_id, kwargs['num_objects'], kwargs['pen_weight'])
-    elif fwd_pol == 'rr':
-        if cache_pol == 'none':
+        case 'rr', 'none':
             return RoundRobinNode(env, node_id)
-        elif cache_pol == 'lru':
+        case 'rr', 'lru':
             return RRLRUNode(env, node_id, kwargs['num_objects'])
-        elif cache_pol == 'lfu':
+        case 'rr', 'lfu':
             return RRLFUNode(env, node_id, kwargs['num_objects'])
-        elif cache_pol == 'wlfu':
+        case 'rr', 'wlfu':
             return RRWLFUNode(env, node_id, kwargs['num_objects'])
-        elif cache_pol == 'fifo':
+        case 'rr', 'fifo':
             return RRFIFONode(env, node_id)
-        elif cache_pol == 'unif':
+        case 'rr', 'unif':
             return RRUNIFNode(env, node_id)
-        elif cache_pol == 'palfu':
+        case 'rr', 'palfu':
             return RRPALFUNode(env, node_id, kwargs['num_objects'], kwargs['pen_weight'])
-    elif fwd_pol == 'lrt':
-        if cache_pol == 'none':
+        case 'lrt', 'none':
             return LeastResponseTimeNode(env, node_id)
-        elif cache_pol == 'lru':
+        case 'lrt', 'lru':
             return LRTLRUNode(env, node_id, kwargs['num_objects'])
-        elif cache_pol == 'lfu':
+        case 'lrt', 'lfu':
             return LRTLFUNode(env, node_id, kwargs['num_objects'])
-        elif cache_pol == 'wlfu':
+        case 'lrt', 'wlfu':
             return LRTWLFUNode(env, node_id, kwargs['num_objects'])
-        elif cache_pol == 'fifo':
+        case 'lrt', 'fifo':
             return LRTFIFONode(env, node_id)
-        elif cache_pol == 'unif':
+        case 'lrt', 'unif':
             return LRTUNIFNode(env, node_id)
-        elif cache_pol == 'palfu':
+        case 'lrt', 'palfu':
             return LRTPALFUNode(env, node_id, kwargs['num_objects'], kwargs['pen_weight'])
-    elif fwd_pol == 'svip' and cache_pol in ['svip','none']:
-        return VIPNode(env, node_id, kwargs['num_objects'], kwargs['pen_weight'], **kwargs['vip_args'])
-    elif fwd_pol == 'mvip' and cache_pol in ['mvip','none']:
-        return MVIPNode(env, node_id, kwargs['num_objects'], kwargs['pen_weight'], **kwargs['vip_args'])
-    else:
-        print("fwd_pol: {}, cache_pol: {}".format(fwd_pol,cache_pol))
-        raise ValueError("No node with the specified policies exist.")
+        case 'svip', cache_pol if cache_pol in ['svip','none']:
+            return VIPNode(env, node_id, kwargs['num_objects'], kwargs['pen_weight'], **kwargs['vip_args'])
+        case 'mvip', cache_pol if cache_pol in ['mvip','none']:
+            return MVIPNode(env, node_id, kwargs['num_objects'], kwargs['pen_weight'], **kwargs['vip_args'])
+        case _, _:
+            print("fwd_pol: {}, cache_pol: {}".format(fwd_pol,cache_pol))
+            raise ValueError("No node with the specified policies exist.")
 
 # Filter to eliminate certain combination of parameters that are not meaningful
 def ignoreDudFilter(params):
