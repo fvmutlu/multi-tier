@@ -137,7 +137,7 @@ class Cache(object):
             return obj
         else:
             print(f"TIME: {self.env.now} ERROR: Algorithm error while trying to evict object {evicted_object_id}: object not in cache.")
-            raise IndexError("Object not in cache.")
+            raise IndexError(f"Object {evicted_object_id} not in cache.")
     
     def getStats(self):
         return self.stats.copy()
