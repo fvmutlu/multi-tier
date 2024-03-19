@@ -35,9 +35,10 @@ args = parser.parse_args()
 numeric_log_level = getattr(logging, args.loglevel.upper(), None)
 logging.basicConfig(filename = './sim_outputs/' + args.experiment_name + '_log.txt',
                     filemode = 'w',
-                    format = '[%(asctime)s] %(levelname)s : %(message)s',
+                    format = '[%(asctime)s %(filename)s] %(levelname)s : %(message)s',
                     datefmt = '%Y-%m-%d %H:%M:%S',
                     level = numeric_log_level)
+logger = logging.getLogger("logger")
 
 if args.config_url:
     response = urlopen(args.config_url)
@@ -46,7 +47,7 @@ elif args.config_path:
     config_file = open(args.config_path, 'r')
     test_config = json.loads(config_file.read())
 
-logging.info("Config read, setting up simulation.")
+logger.info("Config read, setting up simulation.")
 
 top_params = topologies[args.topology]
 if top_params['fixed']:
@@ -93,8 +94,15 @@ sim_params = test_config['sim_params']
 param_set = [params for params in namedProduct(**sim_params)]
 param_set = [params for params in filter(ignoreDudFilter, param_set)]
 
-logging.info("Setup complete, generating requests.")
+logger.info("Setup complete, generating requests.")
 reqgen_begin_time = datetime.now()
+
+source_map_dict = {}
+for params in param_set:
+    source_map_key = (params['num_objects'], params['source_map_seed'])
+    if source_map_key in source_map_dict:
+        continue
+    source_map_dict[source_map_key] = assignSources(params['source_map_seed'], sources, params['num_objects'])
 
 requests_dict = {}
 for params in param_set:
@@ -104,7 +112,7 @@ for params in param_set:
     requests_dict[requests_key] = offlineRequestGenerator(requester_nodes, *requests_key)
 
 reqgen_end_time = datetime.now()
-logging.info("Request generation complete, elapsed time: {:s}".format(timeDiffPrinter(reqgen_end_time - reqgen_begin_time)))
+logger.info("Request generation complete, elapsed time: {:s}".format(timeDiffPrinter(reqgen_end_time - reqgen_begin_time)))
 
 def simRun(
     fwd_pol = 'none',
@@ -128,7 +136,6 @@ def simRun(
     cache_write_pens  = [4, 2]
     ):
     env = sp.Environment()
-    objects = list(range(num_objects))
 
     network = getNetwork(env)
 
@@ -137,7 +144,7 @@ def simRun(
 
     network.installLinks(links, fwd_pol, cache_pol)
 
-    source_map = assignSources(source_map_seed, sources, objects)
+    source_map = source_map_dict[(num_objects, source_map_seed)]
     network.installSources(sources, source_read_rate, source_map)
 
     cache_dict = {'cap': cache_capacities, 'read_rate': cache_read_rates, 'write_rate': cache_write_rates, 'read_pen': cache_read_pens, 'write_pen': cache_write_pens}
@@ -157,14 +164,9 @@ def simRun(
     return network.getStats()
 
 
-logging.info("Starting simulation run.")
+logger.info("Starting simulation run.")
 test_begin_time = datetime.now()
 
-## USE THIS NON-PARALLELIZED LOOP FOR PROFILING PURPOSES (COMMENT OUT BELOW Parallel JOB FIRST)
-#results = []
-#for params in param_set:
-#    results.append(simRun(**params))
-## USE THIS Parallel JOB FOR FASTER SIMULATIONS (COMMENT OUT ABOVE LOOP FIRST)
 if args.profiling:
     results = []
     for params in param_set:
@@ -173,9 +175,9 @@ else:
     results = jb.Parallel(n_jobs = args.num_cpus)(jb.delayed(simRun)(**params) for params in param_set)
 
 test_end_time = datetime.now()
-logging.info("Simulation run complete, elapsed time: {:s}".format(timeDiffPrinter(test_end_time - test_begin_time)))
+logger.info("Simulation run complete, elapsed time: {:s}".format(timeDiffPrinter(test_end_time - test_begin_time)))
 
-logging.info("Inserting data into DB.")
+logger.info("Inserting data into DB.")
 tic = datetime.now()
 
 data_rows = []
@@ -186,4 +188,4 @@ data_db = TinyDB('./sim_outputs/' + args.experiment_name + '_db.json')
 data_db.insert({'experiment_name': args.experiment_name, 'topology': args.topology, 'elapse_real_time': str(test_end_time - test_begin_time), 'data': data_rows})
 
 toc = datetime.now()
-logging.info("Data insertion complete, elapsed time: {:s}.".format(timeDiffPrinter(toc-tic)))
+logger.info("Data insertion complete, elapsed time: {:s}.".format(timeDiffPrinter(toc-tic)))
