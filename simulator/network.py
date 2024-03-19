@@ -54,18 +54,13 @@ class Network(object):
         self.recordStats()
         return
 
-    def statLogger(self, interval):
-        while True:
-            yield self.env.timeout(interval)
-            self.recordStats()
-
     def recordStats(self):
         time = self.env.now
         for node in self.nodes:
             self.stats.append({'sim_time': time, 'node_id': node.id, **node.getStats()})
     
     def getStats(self):
-        return deepcopy(self.stats)
+        return self.stats
 
 def getNetwork(env):
     return Network(env)

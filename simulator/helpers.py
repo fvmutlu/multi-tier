@@ -113,9 +113,9 @@ def assignRouting(G, node_ids, source_map):
                     fibs[node_id][object_id] = [hop_id for hop_id in unique_next_hops]
     return fibs
 
-def assignSources(seed, nodes, objects):
+def assignSources(seed, nodes, num_objects):
     rng = default_rng(seed)
-    source_map_inv = rng.choice(nodes, size = len(objects), replace = True)
-    source_map = [[object_id for object_index, object_id in enumerate(objects) if source_map_inv[object_index] == node_id] for node_index, node_id in enumerate(nodes)]
+    source_map_inv = rng.choice(nodes, size = num_objects, replace = True)
+    source_map = [[object_id for object_id in range(num_objects) if source_map_inv[object_id] == node_id] for node_id in nodes]
 
     return source_map

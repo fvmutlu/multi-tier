@@ -252,7 +252,7 @@ class Node(object):
         yield self.env.timeout(0)
         return
 
-    def updateStats(self):
+    def getStats(self):
         if self.is_source:
             source_stats = self.permastore.getStats()
             self.stats['source_hits'] = source_stats['reads']
@@ -274,10 +274,7 @@ class Node(object):
                 self.stats['cache_hit_delays'].append(cache_stats['read_delay'])
                 self.stats['cache_read_penalties'].append(read_pen)
                 self.stats['cache_write_penalties'].append(write_pen)
-    
-    def getStats(self):
-        self.updateStats()
-        return deepcopy(self.stats)
+        return self.stats
 
 class IANode(Node):
     def __init__(self, env, node_id):

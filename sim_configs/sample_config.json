@@ -1,6 +1,5 @@
 {
     "description": "A sample test config file",
-    "logging_interval": 100000,
     "sim_params":
     {
         "fwd_pol"                : ["lrt","mvip"],
