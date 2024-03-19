@@ -5,7 +5,7 @@ import simpy as sp
 from collections import namedtuple
 
 class Permastore(object):
-    def __init__(self, env, read_rate, contents):
+    def __init__(self, env: sp.Environment, read_rate: int, contents: set):
         self.env = env
         self.read_rate = read_rate
         self.contents = contents
@@ -41,9 +41,6 @@ class Permastore(object):
         toc = self.env.now
         self.stats['read_delay'] += toc - tic
         return obj
-    
-    def getContents(self):
-        return self.contents.copy()
         
     def getStats(self):
         return {**self.stats}
@@ -51,14 +48,14 @@ class Permastore(object):
 CacheTask = namedtuple('CacheTask', ['type', 'object_id'])
 
 class Cache(object):
-    def __init__(self, env, cap, read_rate, write_rate, read_pen, write_pen):
+    def __init__(self, env: sp.Environment, cap: int, read_rate: int | float, write_rate: int | float, read_pen: int | float, write_pen: int | float):
         self.env = env
         self.capacity = cap
         self.read_rate = read_rate
         self.write_rate = write_rate
         self.read_penalty = read_pen
         self.write_penalty = write_pen
-        self.contents = []
+        self.contents = set()
         self.cur_size = 0
         self.task_queue = sp.Store(env)
         self.out_buffer = sp.Store(env)
@@ -121,7 +118,7 @@ class Cache(object):
             return True
         else:
             self.stats['writes'] += 1
-            self.contents.append(object_id)
+            self.contents.add(object_id)
             self.cur_size += 1
             task = CacheTask(type = 'w', object_id = object_id)
             self.task_queue.put(task)
@@ -133,17 +130,14 @@ class Cache(object):
             self.contents.remove(evicted_object_id)
             task = CacheTask(type = 'r', object_id = evicted_object_id)
             self.task_queue.put(task)
-            self.contents.append(cached_object_id)
+            self.contents.add(cached_object_id)
             task = CacheTask(type = 'w', object_id = cached_object_id)
             self.task_queue.put(task)
             obj = yield self.out_buffer.get()
             return obj
         else:
             print(f"TIME: {self.env.now} ERROR: Algorithm error while trying to evict object {evicted_object_id}: object not in cache.")
-            raise IndexError("Object not in cache.")
-    
-    def getContents(self):
-        return self.contents.copy()
+            raise IndexError(f"Object {evicted_object_id} not in cache.")
     
     def getStats(self):
         return self.stats.copy()
