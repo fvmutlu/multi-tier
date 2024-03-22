@@ -13,7 +13,7 @@ from typing import Tuple
 from .policies import *
 from .utils import convertListFieldsToTuples, namedProduct
 
-@dataclass
+@dataclass(eq=True,frozen=True)
 class SimulationParameters:
     fwd_pol: str = 'none'
     cache_pol: str = 'none'
@@ -33,12 +33,29 @@ class SimulationParameters:
     cache_read_rates: Tuple[int] = (20, 10)
     cache_write_rates: Tuple[int] = (20, 10)
     cache_read_pens: Tuple[int] = (2, 1)
+    cache_write_pens: Tuple[int] = (4, 2)
+
+    def __iter__(self):
+        return iter(self.__dict__.items())
+
+    def items(self):
+        return self.__dict__.items()
+
+    def keys(self):
+        return self.__dict__.keys()
+
+    def values(self):
+        return self.__dict__.values()
+
+    def __getitem__(self, key):
+        return getattr(self, key)
 
 def simConfigToParamSets(config):
     param_sets = [params for params in namedProduct(**config)]
     param_sets = [params for params in filter(ignoreDudFilter, param_sets)]
     param_sets = [convertListFieldsToTuples(params) for params in param_sets]
     param_sets = [SimulationParameters(**params) for params in param_sets]
+    return param_sets
 
 def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
     match fwd_pol, cache_pol:

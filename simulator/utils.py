@@ -138,7 +138,6 @@ def convertListFieldsToTuples(dictionary):
     """
     for key, value in dictionary.items():
         if isinstance(value, list):
-            # Convert the list to a tuple
             dictionary[key] = tuple(value)
     return dictionary
 

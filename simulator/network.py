@@ -15,7 +15,7 @@ class Network(object):
         self.nodes = []
 
         # Statistics
-        self.stats = []
+        self.stats = {}
     
     def installNodes(self, num_nodes, fwd_pol, cache_pol, **kwargs):
         for node_id in range(num_nodes):
@@ -55,9 +55,9 @@ class Network(object):
         return
 
     def recordStats(self):
-        time = self.env.now
+        self.stats['sim_time'] = self.env.now
         for node in self.nodes:
-            self.stats.append({'sim_time': time, 'node_id': node.id, **node.getStats()})
+            self.stats[node.id] = {**node.getStats()}
     
     def getStats(self):
         return self.stats

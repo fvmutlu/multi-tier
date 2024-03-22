@@ -3,7 +3,6 @@ import numpy as np
 import simpy as sp
 import joblib as jb
 import networkx as nx
-from tinydb import TinyDB
 
 # Builtin imports
 import argparse
@@ -11,8 +10,9 @@ import json
 import logging
 from itertools import product
 from datetime import datetime
-from time import localtime
+from time import process_time
 from urllib.request import urlopen
+from hashlib import sha256
 
 # Internal imports
 from .topologies import topologies, getRandomTopology
@@ -21,134 +21,170 @@ from .helpers import (
     assignSources,
     assignRouting,
     offlineRequestGenerator,
-    ignoreDudFilter
+    ignoreDudFilter,
+    simConfigToParamSets,
 )
 from .utils import namedProduct, namedZip, timeDiffPrinter
 
 # Argument parsing
 parser = argparse.ArgumentParser()
-parser.add_argument('--experiment_name', type = str)
-parser.add_argument('--topology', type = str)
-parser.add_argument('-c', '--num_cpus', type = int)
-parser.add_argument('--loglevel', type = str, default = "ERROR")
-parser.add_argument('--profiling', action = argparse.BooleanOptionalAction)
+parser.add_argument("--experiment_name", type=str)
+parser.add_argument("--topology", type=str)
+parser.add_argument("-c", "--num_cpus", type=int)
+parser.add_argument("--loglevel", type=str, default="ERROR")
+parser.add_argument("--profiling", action=argparse.BooleanOptionalAction)
 config_mutex_group = parser.add_mutually_exclusive_group()
-config_mutex_group.add_argument('--config_path', type = str)
-config_mutex_group.add_argument('--config_url', type = str)
+config_mutex_group.add_argument("--config_path", type=str)
+config_mutex_group.add_argument("--config_url", type=str)
 args = parser.parse_args()
 
 numeric_log_level = getattr(logging, args.loglevel.upper(), None)
-logging.basicConfig(filename = './sim_outputs/' + args.experiment_name + '_log.txt',
-                    filemode = 'w',
-                    format = '[%(asctime)s %(filename)s] %(levelname)s : %(message)s',
-                    datefmt = '%Y-%m-%d %H:%M:%S',
-                    level = numeric_log_level)
+logging.basicConfig(
+    filename="./sim_outputs/" + args.experiment_name + "_log.txt",
+    filemode="w",
+    format="[%(asctime)s %(filename)s] %(levelname)s : %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=numeric_log_level,
+)
 logger = logging.getLogger("logger")
 
 if args.config_url:
     response = urlopen(args.config_url)
     test_config = json.loads(response.read())
 elif args.config_path:
-    config_file = open(args.config_path, 'r')
+    config_file = open(args.config_path, "r")
     test_config = json.loads(config_file.read())
 
 logger.info("Config read, setting up simulation.")
 
 top_params = topologies[args.topology]
-if top_params['fixed']:
-    num_nodes = top_params['num_nodes']
-    adj_mat = top_params['adjacency_matrix']
-    top_graph = nx.from_numpy_array(adj_mat, create_using = nx.DiGraph)
+if top_params["fixed"]:
+    num_nodes = top_params["num_nodes"]
+    adj_mat = top_params["adjacency_matrix"]
+    top_graph = nx.from_numpy_array(adj_mat, create_using=nx.DiGraph)
 else:
-    top_graph = getRandomTopology(args.topology, **top_params['top_args'])
+    top_graph = getRandomTopology(args.topology, **top_params["top_args"])
     adj_mat = nx.to_numpy_array(top_graph, dtype=int)
     num_nodes = adj_mat.shape[0]
-    top_graph = nx.from_numpy_array(adj_mat, create_using = nx.DiGraph)
-    
+    top_graph = nx.from_numpy_array(adj_mat, create_using=nx.DiGraph)
+
 nodes = list(range(num_nodes))
 
 # Set source nodes
-if top_params['source_nodes']:
-    sources = top_params['source_nodes']
+if top_params["source_nodes"]:
+    sources = top_params["source_nodes"]
 else:
     sources = nodes
 
 # Set caching nodes
-if top_params['cache_nodes']:
-    cache_nodes = top_params['cache_nodes']
+if top_params["cache_nodes"]:
+    cache_nodes = top_params["cache_nodes"]
 else:
     cache_nodes = nodes
 
 # Set requester nodes
-if top_params['requester_nodes']:
-    requester_nodes = top_params['requester_nodes']
+if top_params["requester_nodes"]:
+    requester_nodes = top_params["requester_nodes"]
 else:
     requester_nodes = nodes
 
 # Set link capacities
-if isinstance(top_params['link_caps'], (int,float)):
+if isinstance(top_params["link_caps"], (int, float)):
     link_caps = np.empty_like(adj_mat)
-    link_caps[np.where(adj_mat != 0)] = top_params['link_caps']
+    link_caps[np.where(adj_mat != 0)] = top_params["link_caps"]
 else:
-    link_caps = top_params['link_caps']
+    link_caps = top_params["link_caps"]
 
 # Build links
 links = []
-for v, u in product(nodes,nodes):
+for v, u in product(nodes, nodes):
     if adj_mat[v][u] != 0:
-        link = {'edge': (v, u), 'cap': link_caps[v][u], 'prop_delay': 0, 'ctrl_args': {}}
+        link = {
+            "edge": (v, u),
+            "cap": link_caps[v][u],
+            "prop_delay": 0,
+            "ctrl_args": {},
+        }
         links.append(link)
 
-sim_params = test_config['sim_params']
+""" sim_params = test_config["sim_params"]
 param_set = [params for params in namedProduct(**sim_params)]
-param_set = [params for params in filter(ignoreDudFilter, param_set)]
+param_set = [params for params in filter(ignoreDudFilter, param_set)] """
+
+param_set = simConfigToParamSets(test_config)
 
 logger.info("Setup complete, generating requests.")
 reqgen_begin_time = datetime.now()
 
 source_map_dict = {}
 for params in param_set:
-    source_map_key = (params['num_objects'], params['source_map_seed'])
+    source_map_key = (params.num_objects, params.source_map_seed)
     if source_map_key in source_map_dict:
         continue
-    source_map_dict[source_map_key] = assignSources(params['source_map_seed'], sources, params['num_objects'])
+    source_map_dict[source_map_key] = assignSources(
+        params.source_map_seed, sources, params.num_objects
+    )
 
 requests_dict = {}
 for params in param_set:
-    requests_key = (params['num_objects'], params['request_generator_seed'], params['stop_time'], params['request_rate'], params['request_dist_param'], params['request_dist_type'])
+    requests_key = (
+        params.num_objects,
+        params.request_generator_seed,
+        params.stop_time,
+        params.request_rate,
+        params.request_dist_param,
+        params.request_dist_type,
+    )
     if requests_key in requests_dict:
         continue
-    requests_dict[requests_key] = offlineRequestGenerator(requester_nodes, *requests_key)
+    requests_dict[requests_key] = offlineRequestGenerator(
+        requester_nodes, *requests_key
+    )
 
 reqgen_end_time = datetime.now()
-logger.info("Request generation complete, elapsed time: {:s}".format(timeDiffPrinter(reqgen_end_time - reqgen_begin_time)))
+logger.info(
+    "Request generation complete, elapsed time: {:s}".format(
+        timeDiffPrinter(reqgen_end_time - reqgen_begin_time)
+    )
+)
+
 
 def simRun(
-    fwd_pol = 'none',
-    cache_pol = 'none',
-    num_objects = 1000,
-    source_read_rate = 1000,
-    source_map_seed = 1,
-    request_generator_seed = 1,
-    stop_time = 100,
-    request_rate = 10,
-    request_dist_param = 0.75,
-    request_dist_type = 'zipf',
-    pen_weight = 0,
-    vip_inc = 1,
-    vip_slot_len = 1,
-    vip_win_size = 30,
-    cache_capacities  = [10, 100],
-    cache_read_rates  = [20, 10],
-    cache_write_rates = [20, 10],
-    cache_read_pens   = [2, 1],
-    cache_write_pens  = [4, 2]
-    ):
+    fwd_pol="none",
+    cache_pol="none",
+    num_objects=1000,
+    source_read_rate=1000,
+    source_map_seed=1,
+    request_generator_seed=1,
+    stop_time=100,
+    request_rate=10,
+    request_dist_param=0.75,
+    request_dist_type="zipf",
+    pen_weight=0,
+    vip_inc=1,
+    vip_slot_len=1,
+    vip_win_size=30,
+    cache_capacities=[10, 100],
+    cache_read_rates=[20, 10],
+    cache_write_rates=[20, 10],
+    cache_read_pens=[2, 1],
+    cache_write_pens=[4, 2],
+):
+    start_time = process_time()
+
     env = sp.Environment()
 
     network = getNetwork(env)
 
-    additional_arguments = {'num_objects': num_objects, 'pen_weight': pen_weight, 'vip_args': {'vip_inc': vip_inc, 'vip_slot_len': vip_slot_len, 'vip_win_size': vip_win_size}}
+    additional_arguments = {
+        "num_objects": num_objects,
+        "pen_weight": pen_weight,
+        "vip_args": {
+            "vip_inc": vip_inc,
+            "vip_slot_len": vip_slot_len,
+            "vip_win_size": vip_win_size,
+        },
+    }
     network.installNodes(num_nodes, fwd_pol, cache_pol, **additional_arguments)
 
     network.installLinks(links, fwd_pol, cache_pol)
@@ -156,19 +192,37 @@ def simRun(
     source_map = source_map_dict[(num_objects, source_map_seed)]
     network.installSources(sources, source_read_rate, source_map)
 
-    cache_dict = {'cap': cache_capacities, 'read_rate': cache_read_rates, 'write_rate': cache_write_rates, 'read_pen': cache_read_pens, 'write_pen': cache_write_pens}
+    cache_dict = {
+        "cap": cache_capacities,
+        "read_rate": cache_read_rates,
+        "write_rate": cache_write_rates,
+        "read_pen": cache_read_pens,
+        "write_pen": cache_write_pens,
+    }
     caches = [i for i in namedZip(**cache_dict)]
     network.installCaches(cache_nodes, caches)
 
     fibs = assignRouting(top_graph, nodes, source_map)
     network.installFIBs(fibs)
 
-    requests = requests_dict[(num_objects, request_generator_seed, stop_time, request_rate, request_dist_param, request_dist_type)]
+    requests = requests_dict[
+        (
+            num_objects,
+            request_generator_seed,
+            stop_time,
+            request_rate,
+            request_dist_param,
+            request_dist_type,
+        )
+    ]
     network.initRequests(requester_nodes, requests)
 
     termination_watcher = env.process(network.terminateSim(requester_nodes))
-    env.run(until = termination_watcher)
-    return network.getStats()
+    env.run(until=termination_watcher)
+
+    elapsed_time = process_time() - start_time
+
+    return network.getStats(), elapsed_time
 
 
 logger.info("Starting simulation run.")
@@ -179,20 +233,29 @@ if args.profiling:
     for params in param_set:
         results.append(simRun(**params))
 else:
-    results = jb.Parallel(n_jobs = args.num_cpus)(jb.delayed(simRun)(**params) for params in param_set)
+    results = jb.Parallel(n_jobs=args.num_cpus)(
+        jb.delayed(simRun)(**params) for params in param_set
+    )
 
 test_end_time = datetime.now()
-logger.info("Simulation run complete, elapsed time: {:s}".format(timeDiffPrinter(test_end_time - test_begin_time)))
+logger.info(
+    "Simulation run complete, elapsed time: {:s}".format(
+        timeDiffPrinter(test_end_time - test_begin_time)
+    )
+)
 
-logger.info("Inserting data into DB.")
-tic = datetime.now()
+data_collection = {}
+for i, params in enumerate(param_set):  # Per param set
+    param_hash = sha256(repr(params).encode()).hexdigest()[:8]
+    data_collection[param_hash] = {
+        "parameters": {**params},
+        "cpu_time": results[i][1],
+        "data": {**results[i][0]},
+    }
 
-data_rows = []
-for i, params in enumerate(param_set): # Per param set
-    for res in results[i]: # Per log interval
-        data_rows.append({**params, **res})    
-data_db = TinyDB('./sim_outputs/' + args.experiment_name + '_db.json')
-data_db.insert({'experiment_name': args.experiment_name, 'topology': args.topology, 'elapse_real_time': str(test_end_time - test_begin_time), 'data': data_rows})
-
-toc = datetime.now()
-logger.info("Data insertion complete, elapsed time: {:s}.".format(timeDiffPrinter(toc-tic)))
+json_file_path = (
+    "./sim_outputs/" + args.experiment_name + "_" + args.topology + "_db.json"
+)
+with open(json_file_path, "w") as json_file:
+    json.dump(data_collection, json_file)
+logger.info("Data dumped to JSON file: {}".format(json_file_path))
