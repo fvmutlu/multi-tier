@@ -6,6 +6,7 @@ from collections import deque, defaultdict
 from itertools import product
 from datetime import timedelta
 
+
 def timeDiffPrinter(time_diff: timedelta):
     """
     Convert a timedelta object into a formatted string representation of time difference.
@@ -34,6 +35,7 @@ def timeDiffPrinter(time_diff: timedelta):
     formatted_time_diff = " ".join(time_components)
     return formatted_time_diff
 
+
 def namedProduct(**items: dict):
     """
     Generates Cartesian product of named items from multiple arguments.
@@ -45,7 +47,7 @@ def namedProduct(**items: dict):
         A generator object that contains all combinations of named items from the input.
 
     Example 1:
-        >>> input_dict = {'a': [1,2], 'b': ['x','y']} 
+        >>> input_dict = {'a': [1,2], 'b': ['x','y']}
         >>> for combination in namedProduct(**input_dict):
         >>>     print(combination)
         {'a': 1, 'b': 'x'}
@@ -63,6 +65,7 @@ def namedProduct(**items: dict):
     for res in product(*vals):
         yield dict(zip(names, res))
 
+
 def namedZip(**items: dict):
     """
     Generates dot product of named items from multiple arguments.
@@ -74,7 +77,7 @@ def namedZip(**items: dict):
         A generator object that contains all combinations of named items from the input.
 
     Example 1:
-        >>> input_dict = {'a': [1,2], 'b': ['x','y']} 
+        >>> input_dict = {'a': [1,2], 'b': ['x','y']}
         >>> for combination in namedProduct(**input_dict):
         >>>     print(combination)
         {'a': 1, 'b': 'x'}
@@ -84,6 +87,7 @@ def namedZip(**items: dict):
     vals = items.values()
     for res in zip(*vals):
         yield dict(zip(names, res))
+
 
 def invertDict(input_dict: dict):
     """
@@ -106,6 +110,7 @@ def invertDict(input_dict: dict):
             new_dict[item].append(key)
     return dict(new_dict)
 
+
 def resetDict(input_dict: dict, default_value):
     """
     Resets the values in a dictionary to a given default value.
@@ -113,11 +118,11 @@ def resetDict(input_dict: dict, default_value):
     Args:
         input_dict: The input dictionary to be reset.
         default_value: Default value to reset every value in the dictionary to.
-    
+
     Returns:
         dict: A new dictionary with the same keys as those of input_dict
               but all values equal to default_value.
-    
+
     Example:
     >>> input_dict = {'a': 5, 'b': 12}
     {'a': 5, 'b': 12}
@@ -125,6 +130,7 @@ def resetDict(input_dict: dict, default_value):
     {'a': 0, 'b': 0}
     """
     return input_dict.fromkeys(input_dict, default_value)
+
 
 def convertListFieldsToTuples(dictionary):
     """
@@ -140,6 +146,7 @@ def convertListFieldsToTuples(dictionary):
         if isinstance(value, list):
             dictionary[key] = tuple(value)
     return dictionary
+
 
 def randargmax(arr: np.ndarray, axis: int, seed: int = 1):
     """
@@ -161,7 +168,10 @@ def randargmax(arr: np.ndarray, axis: int, seed: int = 1):
         array([2, 0])
     """
     rng = np.random.default_rng(seed)
-    return np.apply_along_axis(lambda x: rng.choice(np.where(x==x.max())[0]), axis=axis, arr=arr)
+    return np.apply_along_axis(
+        lambda x: rng.choice(np.where(x == x.max())[0]), axis=axis, arr=arr
+    )
+
 
 class wique:
     """
@@ -178,6 +188,7 @@ class wique:
         __init__(self, maxlen=10): Initializes the wique object with a specified maximum length.
         append(self, x): Adds a new element to the window, updating mean and sum accordingly.
     """
+
     def __init__(self, maxlen: int = 10):
         """
         Initializes a wique object with a specified maximum length.
@@ -187,7 +198,7 @@ class wique:
         """
         self.maxlen = maxlen
         self.curlen = 0
-        self.q = deque(maxlen = maxlen)
+        self.q = deque(maxlen=maxlen)
         self.mean = 0
         self.sum = 0
 

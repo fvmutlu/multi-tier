@@ -7,9 +7,10 @@ import numpy as np
 from .node import Node
 from .utils import wique
 
+
 class LRUNode(Node):
     def lruInit(self, num_objects):
-        self.lru_table = [0]*num_objects
+        self.lru_table = [0] * num_objects
 
     def receiveInterest(self, remote_id, request):
         self.lru_table[request.object_id] = self.env.now
@@ -26,9 +27,10 @@ class LRUNode(Node):
                 cache.cacheObject(object_id)
                 return
 
+
 class LFUNode(Node):
     def lfuInit(self, num_objects):
-        self.lfu_table = [0]*num_objects
+        self.lfu_table = [0] * num_objects
 
     def receiveInterest(self, remote_id, request):
         self.lfu_table[request.object_id] += 1
@@ -45,11 +47,12 @@ class LFUNode(Node):
                 cache.cacheObject(object_id)
                 return
 
+
 class WLFUNode(Node):
     def wlfuInit(self, num_objects):
-        self.lfu_table = [0]*num_objects
-        self.lfu_counters = [0]*num_objects
-        self.lfu_windows = [wique(maxlen = 30) for _ in range(num_objects)]
+        self.lfu_table = [0] * num_objects
+        self.lfu_counters = [0] * num_objects
+        self.lfu_windows = [wique(maxlen=30) for _ in range(num_objects)]
         self.env.process(self.wlfuProcess(num_objects))
 
     def receiveInterest(self, remote_id, request):
@@ -64,6 +67,7 @@ class WLFUNode(Node):
                 self.lfu_counters[k] = 0
                 self.lfu_table[k] = self.lfu_windows[k].mean
 
+
 # TODO: FIFO, UNIF (and potentially LRU) cache.contents have not yet been changed to work as sets, since they are better implemented as different data structures
 class FIFONode(Node):
     def decideCaching(self, object_id):
@@ -76,6 +80,7 @@ class FIFONode(Node):
                 cache.cacheObject(object_id)
                 return
 
+
 class UNIFNode(Node):
     def decideCaching(self, object_id):
         cache = np.random.choice(self.caches)
@@ -84,6 +89,7 @@ class UNIFNode(Node):
             yield self.env.process(cache.replaceObject(victim_id, object_id))
         else:
             cache.cacheObject(object_id)
+
 
 class PALFUNode(LFUNode):
     def lfuInit(self, num_objects, pen_weight):
@@ -99,7 +105,9 @@ class PALFUNode(LFUNode):
             p_wj = self.pw * cache.write_penalty
             if cache.isFull():
                 victim_id = min(cache.contents, key=lambda k: self.lfu_table[k])
-                benefit = r_nj * (self.lfu_table[object_id] - self.lfu_table[victim_id]) - (p_rj + p_wj)
+                benefit = r_nj * (
+                    self.lfu_table[object_id] - self.lfu_table[victim_id]
+                ) - (p_rj + p_wj)
                 benefits.append(benefit)
                 victims.append(victim_id)
             else:
@@ -110,7 +118,9 @@ class PALFUNode(LFUNode):
         j = np.argmax(benefits)
         if benefits[j] > 0:
             if victims[j] is not None:
-                yield self.env.process(self.caches[j].replaceObject(victims[j], object_id))
+                yield self.env.process(
+                    self.caches[j].replaceObject(victims[j], object_id)
+                )
                 self.env.process(self.decideCaching(victims[j]))
             else:
                 self.caches[j].cacheObject(object_id)
