@@ -68,7 +68,7 @@ class WLFUNode(Node):
                 self.lfu_table[k] = self.lfu_windows[k].mean
 
 
-# TODO: FIFO, UNIF (and potentially LRU) cache.contents have not yet been changed to work as sets, since they are better implemented as different data structures
+# TODO: FIFO is currently broken due to cache.contents having been rewritten as a set
 class FIFONode(Node):
     def decideCaching(self, object_id):
         for cache in self.caches:
@@ -85,7 +85,7 @@ class UNIFNode(Node):
     def decideCaching(self, object_id):
         cache = np.random.choice(self.caches)
         if cache.isFull():
-            victim_id = np.random.choice(cache.contents)
+            victim_id = np.random.choice(tuple(cache.contents))
             yield self.env.process(cache.replaceObject(victim_id, object_id))
         else:
             cache.cacheObject(object_id)
