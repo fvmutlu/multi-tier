@@ -10,7 +10,8 @@ from .components import Request, InterestPacket, DataPacket
 from .cache import Cache, Permastore
 from .link import Link
 
-Packet = namedtuple('Packet',['type', 'object_id'])
+Packet = namedtuple("Packet", ["type", "object_id"])
+
 
 # TODO: BasicNode now called Node
 class Node(object):
@@ -20,6 +21,7 @@ class Node(object):
     However, it makes no assumptions for forwarding or caching strategies.
     Those functions must be implemented by inheriting classes that define custom forwarding and caching.
     """
+
     def __init__(self, env: sp.Environment, node_id: int):
         # SimPy environment
         self.env = env
@@ -29,7 +31,7 @@ class Node(object):
         self.is_source = False
         self.is_requester = False
         self.has_caches = False
-        
+
         # Packet rx/tx
         self.out_links = {}
         self.in_links = {}
@@ -53,30 +55,30 @@ class Node(object):
 
         # Logging
         self.stats = {
-                     'delay': 0,
-                     'rx_interests': 0,
-                     'gen_reqs': 0,
-                     'done_reqs': 0,
-                     'source_hits': 0,
-                     'source_hit_delay': 0,
-                     'cache_hits': [],
-                     'cache_writes': [],
-                     'cache_replacements': [],
-                     'cache_hit_delays': [],
-                     'cache_read_penalties': [],
-                     'cache_write_penalties': [],
-                     'tx_interests': {}
-                     }
+            "delay": 0,
+            "rx_interests": 0,
+            "gen_reqs": 0,
+            "done_reqs": 0,
+            "source_hits": 0,
+            "source_hit_delay": 0,
+            "cache_hits": [],
+            "cache_writes": [],
+            "cache_replacements": [],
+            "cache_hit_delays": [],
+            "cache_read_penalties": [],
+            "cache_write_penalties": [],
+            "tx_interests": {},
+        }
         self.stat_logs = {}
-                
+
     def addOutputLink(self, remote_id: int, link: Link, ctrl_link: Link):
         """
         Add an output link to the node.
         """
         self.out_links[remote_id] = link
         self.ctrl_out_links[remote_id] = ctrl_link
-        self.stats['tx_interests'][remote_id] = 0
-        
+        self.stats["tx_interests"][remote_id] = 0
+
     def addInputLink(self, remote_id, link, ctrl_link):
         """
         Add an input link to the node.
@@ -115,7 +117,7 @@ class Node(object):
             self.caches = [cache]
             self.has_caches = True
         self.env.process(cache.cacheController())
-    
+
     def addFIB(self, fib, dist_diff=None):
         self.fib = fib
 
@@ -129,7 +131,7 @@ class Node(object):
         while True:
             pkt = yield self.in_links[remote_id].get()
             if pkt.isData():
-                yield self.env.timeout(1/self.in_links[remote_id].link_cap)
+                yield self.env.timeout(1 / self.in_links[remote_id].link_cap)
             if pkt.isData() or pkt.isInterest():
                 self.pkt_buffer.put((remote_id, pkt))
 
@@ -178,10 +180,10 @@ class Node(object):
             self.sendDataPacket(remote_id, request)
         else:
             self.requests.remove(request.seq_id)
-            self.stats['done_reqs'] += 1
-            self.stats['delay'] += request.getDelay()
+            self.stats["done_reqs"] += 1
+            self.stats["delay"] += request.getDelay()
             del request
-        
+
         if self.is_requester:
             if self.req_gen_done and not self.requests:
                 if not (self.can_terminate.triggered or self.can_terminate.processed):
@@ -196,8 +198,8 @@ class Node(object):
         """
         pkt = InterestPacket(request)
         self.out_links[remote_id].put(pkt)
-        self.stats['tx_interests'][remote_id] += 1
-    
+        self.stats["tx_interests"][remote_id] += 1
+
     def sendDataPacket(self, remote_id, request):
         """
         Send a data packet to a remote node.
@@ -219,7 +221,7 @@ class Node(object):
             self.request_counter += 1
             self.requests.append(req_seq)
             req = Request(self.env, self.id, req_seq, object_id)
-            self.stats['gen_reqs'] += 1
+            self.stats["gen_reqs"] += 1
             self.receiveInterest(self.id, req)
         self.req_gen_done = True
 
@@ -255,32 +257,35 @@ class Node(object):
     def getStats(self):
         if self.is_source:
             source_stats = self.permastore.getStats()
-            self.stats['source_hits'] = source_stats['reads']
-            self.stats['source_hit_delay'] = source_stats['read_delay']
+            self.stats["source_hits"] = source_stats["reads"]
+            self.stats["source_hit_delay"] = source_stats["read_delay"]
         if self.has_caches:
-            self.stats['cache_hits']            = []
-            self.stats['cache_writes']          = []
-            self.stats['cache_replacements']    = []
-            self.stats['cache_hit_delays']      = []
-            self.stats['cache_read_penalties']  = []
-            self.stats['cache_write_penalties'] = []
-            for cache in self.caches:                
+            self.stats["cache_hits"] = []
+            self.stats["cache_writes"] = []
+            self.stats["cache_replacements"] = []
+            self.stats["cache_hit_delays"] = []
+            self.stats["cache_read_penalties"] = []
+            self.stats["cache_write_penalties"] = []
+            for cache in self.caches:
                 cache_stats = cache.getStats()
-                read_pen = cache.read_penalty * cache_stats['replacements']
-                write_pen = cache.write_penalty * (cache_stats['writes'] + cache_stats['replacements'])
-                self.stats['cache_hits'].append(cache_stats['reads'])
-                self.stats['cache_writes'].append(cache_stats['writes'])
-                self.stats['cache_replacements'].append(cache_stats['replacements'])
-                self.stats['cache_hit_delays'].append(cache_stats['read_delay'])
-                self.stats['cache_read_penalties'].append(read_pen)
-                self.stats['cache_write_penalties'].append(write_pen)
+                read_pen = cache.read_penalty * cache_stats["replacements"]
+                write_pen = cache.write_penalty * (
+                    cache_stats["writes"] + cache_stats["replacements"]
+                )
+                self.stats["cache_hits"].append(cache_stats["reads"])
+                self.stats["cache_writes"].append(cache_stats["writes"])
+                self.stats["cache_replacements"].append(cache_stats["replacements"])
+                self.stats["cache_hit_delays"].append(cache_stats["read_delay"])
+                self.stats["cache_read_penalties"].append(read_pen)
+                self.stats["cache_write_penalties"].append(write_pen)
         return self.stats
+
 
 class IANode(Node):
     def __init__(self, env, node_id):
         super().__init__(env, node_id)
         self.pit = defaultdict(list)
-    
+
     def receiveInterest(self, remote_id, request):
         request.logEvent(self.id)
         self.stats["rx_interests"] += 1
@@ -310,10 +315,10 @@ class IANode(Node):
                     self.sendDataPacket(remote_id, pending_req)
                 else:
                     self.requests.remove(pending_req.seq_id)
-                    self.stats['done_reqs'] += 1
-                    self.stats['delay'] += pending_req.getDelay()
+                    self.stats["done_reqs"] += 1
+                    self.stats["delay"] += pending_req.getDelay()
                     del pending_req
-        
+
         if self.is_requester:
             if self.req_gen_done and not self.requests:
                 if not (self.can_terminate.triggered or self.can_terminate.processed):
