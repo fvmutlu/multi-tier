@@ -380,13 +380,7 @@ class MVIPNode(VIPNode):
         return vip_alloc
 
     def vipCaching(self):
-        r_nj, p_rj, p_wj = [], [], []
-        total_cache_size = 0
-        for cache in self.caches:
-            total_cache_size += cache.capacity
-            r_nj.append(cache.read_rate)
-            p_rj.append(cache.read_penalty)
-            p_wj.append(cache.write_penalty)
+        total_cache_size = sum(cache.capacity for cache in self.caches)
 
         # Initialize cost matrix, with shape J x k
         cost_matrix = np.zeros((total_cache_size, self.num_objects))
@@ -401,13 +395,16 @@ class MVIPNode(VIPNode):
                 self.cache_scores[k] = self.vip_rx_windows[k].mean
 
             cs_k = self.cache_scores[k]
-            for j in range(len(self.caches)):
+            for j, cache in enumerate(self.caches):
                 tier_slice = self.tier_slices[j]
-                # TODO: penalty weights were missing here, investigate why
                 if object_loc == j:
-                    cost_matrix[tier_slice, k] = r_nj[j] * cs_k + self.pw * p_rj[j]
+                    cost_matrix[tier_slice, k] = (
+                        cache.read_rate * cs_k + self.pw * cache.read_penalty
+                    )
                 else:
-                    cost_matrix[tier_slice, k] = r_nj[j] * cs_k - self.pw * p_wj[j]
+                    cost_matrix[tier_slice, k] = (
+                        cache.read_rate * cs_k - self.pw * cache.write_penalty
+                    )
 
         # Round small values to zero
         cost_matrix[np.abs(cost_matrix) < 1e-6] = 0
