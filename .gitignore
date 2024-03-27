@@ -138,7 +138,7 @@ sim_configs/*
 !sim_configs/README.md
 !sim_configs/sample_config.json
 
-# Math
+# Notebooks
 notebooks/*
 
 # Profiling

@@ -1,16 +1,13 @@
 # External package imports
-
-# Builtin imports
-
-# Internal imports
-
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+
+# Builtin imports
 from collections import defaultdict
 
+# Internal imports
 from .caching_policies import *
 from .forwarding_policies import *
-
 from .utils import wique, invertDict, resetDict
 
 
