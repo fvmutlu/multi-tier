@@ -69,7 +69,6 @@ class Node(object):
             "cache_write_penalties": [],
             "tx_interests": {},
         }
-        self.stat_logs = {}
 
     def addOutputLink(self, remote_id: int, link: Link, ctrl_link: Link):
         """

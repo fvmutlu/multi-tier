@@ -21,10 +21,9 @@ from .helpers import (
     assignSources,
     assignRouting,
     offlineRequestGenerator,
-    ignoreDudFilter,
     simConfigToParamSets,
 )
-from .utils import namedProduct, namedZip, timeDiffPrinter
+from .utils import NpEncoder, namedZip, timeDiffPrinter
 
 # Argument parsing
 parser = argparse.ArgumentParser()
@@ -257,5 +256,5 @@ json_file_path = (
     "./sim_outputs/" + args.experiment_name + "_" + args.topology + "_db.json"
 )
 with open(json_file_path, "w") as json_file:
-    json.dump(data_collection, json_file)
+    json.dump(data_collection, json_file, cls=NpEncoder)
 logger.info("Data dumped to JSON file: {}".format(json_file_path))

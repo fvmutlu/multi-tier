@@ -11,6 +11,7 @@ from typing import Tuple
 
 # Internal imports
 from .policies import *
+from .vip import *
 from .utils import convertListFieldsToTuples, namedProduct
 
 

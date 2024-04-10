@@ -2,11 +2,21 @@
 import numpy as np
 
 # Builtin imports
+import json
 from collections import deque, defaultdict
 from itertools import product
 from datetime import timedelta
 
-
+class NpEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NpEncoder, self).default(obj)
+    
 def timeDiffPrinter(time_diff: timedelta):
     """
     Convert a timedelta object into a formatted string representation of time difference.
