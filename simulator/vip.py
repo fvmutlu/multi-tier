@@ -102,43 +102,17 @@ class VIPNode(Node):
 
         remote_id = neighbors[idx]
 
-        ##LRT tracking
+        # LRT tracking
         self.req_timestamps[remote_id][
             (request.origin_id, request.seq_id)
         ] = self.env.now
-        ##LRT tracking
+        # LRT tracking
 
         self.sendInterestPacket(remote_id, request)
 
     def decideCaching(self, object_id):
-        benefits = []
-        victims = []
-        for j, cache in enumerate(self.caches):
-            if cache.isFull():
-                victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
-                benefits.append(
-                    cache.read_rate
-                    * (self.cache_scores[object_id] - self.cache_scores[victim_id])
-                    - self.pw * (cache.read_penalty + cache.write_penalty)
-                )
-                victims.append(victim_id)
-            else:
-                benefits.append(
-                    cache.read_rate * self.cache_scores[object_id]
-                    - self.pw * cache.write_penalty
-                )
-                victims.append(None)
-        j = np.argmax(benefits)
-        if benefits[j] > 0:
-            if victims[j] is not None:
-                yield self.env.process(
-                    self.caches[j].replaceObject(victims[j], object_id)
-                )
-                self.env.process(self.decideCaching(victims[j]))
-            else:
-                self.caches[j].cacheObject(object_id)
-
-    def decideCaching_OG(self, object_id):
+        if self.cache_scores[object_id] <= 0:
+            return
         for cache in self.caches:
             if cache.isFull():
                 victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
@@ -190,31 +164,27 @@ class VIPNode(Node):
 
     def vipProcess(self):
         while True:
-            # Timeout for a time equal to specified slot length
-            yield self.env.timeout(self.slot_len)
-
             # Set VIP counts to 0 for all sourced objects
             if self.is_source:
                 for k in self.permastore.contents:
                     self.vip_counts[k] = 0
 
-            # Determine virtual plane forwarding
-            fwd_vips = self.vipForwarding()
-
-            # Send VIP count updates
+            # Update neighbors' information with local node's VIP counts
             for remote_id in self.ctrl_out_links:
                 self.ctrl_out_links[remote_id].pushUpdate(self.vip_counts)
 
-            # Update local VIP counts with sent VIPs
-            for b in self.fib_inv:
-                for k in self.fib:
-                    self.vip_counts[k] = max(0, self.vip_counts[k] - fwd_vips[b][k])
-
-            # Receive VIP count updates
+            # Update local node's VIP information with neighbors' VIP counts
             for remote_id in self.ctrl_in_links:
                 self.neighbor_vip_counts[remote_id] = yield self.ctrl_in_links[
                     remote_id
                 ].getUpdate()
+
+            # Determine virtual plane forwarding
+            fwd_vips = self.vipForwarding()
+
+            # Determine virtual plane caching
+            if self.has_caches:
+                self.vipCaching()
 
             # Send VIPs
             for remote_id in self.ctrl_out_links:
@@ -228,26 +198,32 @@ class VIPNode(Node):
                 else:
                     self.ctrl_out_links[remote_id].pushVips({})
 
-            # Receive VIPs
+            # Update local VIP counts with sent VIPs
+            for b in self.fib_inv:
+                for k in self.fib:
+                    self.vip_counts[k] = max(0, self.vip_counts[k] - fwd_vips[b][k])
+
+            # Wait for slot length duration and increment VIP counts due to
+            # exogenous arrivals
+            yield self.env.timeout(self.slot_len)
+
+            # Receive VIPs from neighbors, increment VIP counts accordingly and
+            # update VIP RX windows
             for remote_id in self.ctrl_in_links:
                 rx_vips = yield self.ctrl_in_links[remote_id].getVips()
                 for object_id in rx_vips:
                     self.vip_counts[object_id] += rx_vips[object_id]
-                    # Record RX VIP stats
                     self.vip_rx[object_id] += rx_vips[object_id]
-
-            # Update VIP RX windows
             for k in range(self.num_objects):
                 self.vip_rx_windows[k].append(self.vip_rx[k])
                 self.vip_rx[k] = 0
 
-            # Update local vip counts with cache-drained VIPs
+            # Decrement VIP counts due to caching
             if self.has_caches:
-                self.vipCaching()
                 for j, cache in enumerate(self.caches):
                     for k in self.virtual_caches[j]:
                         self.vip_counts[k] = max(
-                            0, self.vip_counts[k] - self.slot_len * cache.read_rate
+                            self.vip_counts[k] - self.slot_len * cache.read_rate, 0
                         )
 
             # Update VIP stats
@@ -299,25 +275,6 @@ class MVIPNode(VIPNode):
             else:
                 self.caches[j].cacheObject(object_id)
 
-    def vipForwarding(self):
-        b_list = list(self.fib_inv.keys())
-        k_list = list(self.fib.keys())
-        vip_diff = np.zeros((len(b_list), len(k_list)))
-        vip_alloc = {}
-
-        for b_id, b in enumerate(b_list):
-            for k_id, k in enumerate(k_list):
-                vip_diff[b_id, k_id] = (
-                    self.vip_counts[k] - self.neighbor_vip_counts[b][k]
-                )
-
-        k_ids = np.argmax(vip_diff, axis=1)
-        for b_id, b in enumerate(b_list):
-            k = k_list[k_ids[b_id]]
-            vip_alloc[b] = k
-
-        return vip_alloc
-
     def vipCaching(self):
         total_cache_size = sum(cache.capacity for cache in self.caches)
 
@@ -364,74 +321,3 @@ class MVIPNode(VIPNode):
                 v_cache = self.virtual_caches[self.tier_mapping[i]]
                 v_cache.append(k)
                 self.virtual_object_locs[k] = self.tier_mapping[i]
-
-    def vipProcess(self):
-        while True:
-            # Timeout for a time equal to specified slot length
-            yield self.env.timeout(self.slot_len)
-
-            # Set VIP counts to 0 for all sourced objects
-            if self.is_source:
-                for k in self.permastore.contents:
-                    self.vip_counts[k] = 0
-
-            # Determine virtual plane caching
-            if self.has_caches:
-                self.vipCaching()
-
-            # Determine virtual plane forwarding
-            vip_alloc = self.vipForwarding()
-            fwd_vips = {}
-
-            # Update local VIP counts with sent VIPs
-            for b, k in vip_alloc.items():
-                fwd_vips[b] = defaultdict(int)
-                vip_amount = min(self.vip_counts[k], self.out_links[b].link_cap)
-                fwd_vips[b][k] = vip_amount
-                self.vip_counts[k] = max(self.vip_counts[k] - vip_amount, 0)
-
-            # Update local vip counts with cache-drained VIPs
-            for j, cache in enumerate(self.caches):
-                for k in self.virtual_caches[j]:
-                    self.vip_counts[k] = max(
-                        self.vip_counts[k] - self.slot_len * cache.read_rate, 0
-                    )
-
-            # Send VIPs
-            for remote_id in self.ctrl_out_links:
-                if remote_id in fwd_vips:
-                    self.ctrl_out_links[remote_id].pushVips(fwd_vips[remote_id])
-                    for object_id in self.fib_inv[remote_id]:
-                        # Record TX VIP stats
-                        self.neighbor_vip_tx[remote_id, object_id].append(
-                            fwd_vips[remote_id][object_id]
-                        )
-                else:
-                    self.ctrl_out_links[remote_id].pushVips({})
-
-            # Receive VIPs
-            for remote_id in self.ctrl_in_links:
-                rx_vips = yield self.ctrl_in_links[remote_id].getVips()
-                for object_id in rx_vips:
-                    self.vip_counts[object_id] += rx_vips[object_id]
-                    # Record RX VIP stats
-                    self.vip_rx[object_id] += rx_vips[object_id]
-
-            # Update VIP RX windows
-            for k in range(self.num_objects):
-                self.vip_rx_windows[k].append(self.vip_rx[k])
-                self.vip_rx[k] = 0
-
-            # Send VIP count updates
-            for remote_id in self.ctrl_out_links:
-                self.ctrl_out_links[remote_id].pushUpdate(self.vip_counts)
-
-            # Receive VIP count updates
-            for remote_id in self.ctrl_in_links:
-                self.neighbor_vip_counts[remote_id] = yield self.ctrl_in_links[
-                    remote_id
-                ].getUpdate()
-
-            # Update VIP stats
-            self.stats["vip_count_sum"].append(sum(self.vip_counts))
-            self.stats["pit_count_sum"].append(sum([len(q) for q in self.pit.values()]))

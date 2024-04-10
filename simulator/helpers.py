@@ -132,7 +132,9 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
 
 # Filter to eliminate certain combination of parameters that are not meaningful
 def ignoreDudFilter(params):
-    # Rule 1: VIP type fwd/cache policies should only match with the same type of fwd/cache policies; except the "none" cache policy can be matched with any fwd policy
+    # Rule 1: VIP type fwd/cache policies should only match with the same type
+    # of fwd/cache policies; except the "none" cache policy can be matched with
+    # any fwd policy
     if (
         params["cache_pol"] in ["svip", "mvip"]
         and params["fwd_pol"] != params["cache_pol"]
@@ -154,7 +156,8 @@ def ignoreDudFilter(params):
     if len(set(cache_param_shapes)) != 1:
         return False
 
-    # Rule 3: The "none" cache policy should only be matched with empty cache parameters (and vice versa)
+    # Rule 3: The "none" cache policy should only be matched with empty cache
+    # parameters (and vice versa)
     if (
         np.shape(params["cache_capacities"]) == (0,) and params["cache_pol"] != "none"
     ) or (
