@@ -1,11 +1,14 @@
 # External package imports
+import numpy as np
 
 # Builtin imports
+import json
 from typing import List
 from copy import copy
 
 # Internal imports
 from simulator.helpers import SimulationParameters
+from simulator.topologies import topologies
 
 
 def getParamList(base: SimulationParameters, variant_key: str, variant_list: List):
@@ -80,4 +83,28 @@ def getParamList(base: SimulationParameters, variant_key: str, variant_list: Lis
 
 
 def getParamHashList(param_list: List[SimulationParameters]):
-    return [hash(sp) for sp in param_list]
+    return [str(hash(sp)) for sp in param_list]
+
+
+def getJsonDb(db_filepath: str) -> dict:
+    db_file = open(db_filepath, "r")
+    db = json.loads(db_file.read())
+    return db
+
+
+def singleEntrySumDataFieldAcrossNodes(top_name: str, db_entry: dict, key: str):
+    num_nodes = topologies[top_name]["num_nodes"]
+    if isinstance(db_entry["data"]["0"][key], (int, float)):
+        return sum([db_entry["data"][str(node)][key] for node in range(num_nodes)])
+    elif isinstance(db_entry["data"]["0"][key], (list, tuple)):
+        return np.sum(
+            np.array([db_entry["data"][str(node)][key] for node in range(num_nodes)]),
+            axis=0,
+        )
+
+
+def getDataFieldSumsAcrossEntries(top_name: str, db: dict, entry_hashes: str, key: str):
+    return [
+        singleEntrySumDataFieldAcrossNodes(top_name, db[hash], key)
+        for hash in entry_hashes
+    ]
