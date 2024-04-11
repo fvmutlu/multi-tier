@@ -8,6 +8,7 @@ import networkx as nx
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Tuple
+from hashlib import sha256
 
 # Internal imports
 from .policies import *
@@ -51,6 +52,12 @@ class SimulationParameters:
 
     def __getitem__(self, key):
         return getattr(self, key)
+
+    def __repr__(self):
+        return ','.join([f'{key}={value}' for key, value in self.items()])
+    
+    def __hash__(self):
+        return int(sha256(self.__repr__().encode()).hexdigest(), 16)
 
 
 def simConfigToParamSets(config):

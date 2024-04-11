@@ -245,7 +245,8 @@ logger.info(
 
 data_collection = {}
 for i, params in enumerate(param_set):  # Per param set
-    param_hash = sha256(repr(params).encode()).hexdigest()[:8]
+    #param_hash = sha256(repr(params).encode()).hexdigest()[:8]
+    param_hash = hash(params)
     data_collection[param_hash] = {
         "parameters": {**params},
         "cpu_time": results[i][1],
