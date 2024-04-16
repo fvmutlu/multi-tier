@@ -8,6 +8,7 @@ import networkx as nx
 import argparse
 import json
 import logging
+import logging.config
 from itertools import product
 from datetime import datetime
 from time import process_time
@@ -22,6 +23,7 @@ from .helpers import (
     assignRouting,
     offlineRequestGenerator,
     simConfigToParamSets,
+    LOGGING_CONFIG
 )
 from .utils import NpEncoder, namedZip, timeDiffPrinter
 
@@ -30,22 +32,18 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--experiment_name", type=str)
 parser.add_argument("--topology", type=str)
 parser.add_argument("-c", "--num_cpus", type=int)
-parser.add_argument("--loglevel", type=str, default="ERROR")
+parser.add_argument("--logging", action=argparse.BooleanOptionalAction)
 parser.add_argument("--profiling", action=argparse.BooleanOptionalAction)
 config_mutex_group = parser.add_mutually_exclusive_group()
 config_mutex_group.add_argument("--config_path", type=str)
 config_mutex_group.add_argument("--config_url", type=str)
 args = parser.parse_args()
 
-numeric_log_level = getattr(logging, args.loglevel.upper(), None)
-logging.basicConfig(
-    filename="./sim_outputs/" + args.experiment_name + "_log.txt",
-    filemode="w",
-    format="[%(asctime)s %(filename)s] %(levelname)s : %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    level=numeric_log_level,
-)
-logger = logging.getLogger("logger")
+logging.config.dictConfig(LOGGING_CONFIG)
+if args.logging:
+    logger = logging.getLogger('siminfo')
+else:
+    logger = logging.getLogger()
 
 if args.config_url:
     response = urlopen(args.config_url)
