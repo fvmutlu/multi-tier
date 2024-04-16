@@ -13,7 +13,7 @@ from itertools import product
 from datetime import datetime
 from time import process_time
 from urllib.request import urlopen
-from hashlib import sha256
+from os.path import isfile
 
 # Internal imports
 from .topologies import topologies, getRandomTopology
@@ -23,34 +23,35 @@ from .helpers import (
     assignRouting,
     offlineRequestGenerator,
     simConfigToParamSets,
-    LOGGING_CONFIG
+    LOGGING_CONFIG,
 )
 from .utils import NpEncoder, namedZip, timeDiffPrinter
 
 # Argument parsing
 parser = argparse.ArgumentParser()
-parser.add_argument("--experiment_name", type=str)
-parser.add_argument("--topology", type=str)
-parser.add_argument("-c", "--num_cpus", type=int)
+parser.add_argument("-e", "--experiment_name", type=str, default="sample")
+parser.add_argument("-t", "--topology", type=str, default="abilene")
+parser.add_argument("-c", "--num_cpus", type=int, default=-2)
 parser.add_argument("--logging", action=argparse.BooleanOptionalAction)
 parser.add_argument("--profiling", action=argparse.BooleanOptionalAction)
 config_mutex_group = parser.add_mutually_exclusive_group()
-config_mutex_group.add_argument("--config_path", type=str)
-config_mutex_group.add_argument("--config_url", type=str)
+config_mutex_group.add_argument("--config_local", type=str, dest="config_path")
+config_mutex_group.add_argument("--config_url", type=str, dest="config_path")
+parser.set_defaults(config_path="./sim_configs/sample_config.json")
 args = parser.parse_args()
 
 logging.config.dictConfig(LOGGING_CONFIG)
 if args.logging:
-    logger = logging.getLogger('siminfo')
+    logger = logging.getLogger("siminfo")
 else:
     logger = logging.getLogger()
 
-if args.config_url:
+if isfile(args.config_path):
+    with open(args.config_path, "r") as f:
+        test_config = json.loads(f.read())
+else:
     response = urlopen(args.config_url)
     test_config = json.loads(response.read())
-elif args.config_path:
-    config_file = open(args.config_path, "r")
-    test_config = json.loads(config_file.read())
 
 logger.info("Config read, setting up simulation.")
 
@@ -103,10 +104,6 @@ for v, u in product(nodes, nodes):
             "ctrl_args": {},
         }
         links.append(link)
-
-""" sim_params = test_config["sim_params"]
-param_set = [params for params in namedProduct(**sim_params)]
-param_set = [params for params in filter(ignoreDudFilter, param_set)] """
 
 param_set = simConfigToParamSets(test_config)
 
@@ -243,7 +240,7 @@ logger.info(
 
 data_collection = {}
 for i, params in enumerate(param_set):  # Per param set
-    #param_hash = sha256(repr(params).encode()).hexdigest()[:8]
+    # param_hash = sha256(repr(params).encode()).hexdigest()[:8]
     param_hash = hash(params)
     data_collection[param_hash] = {
         "parameters": {**params},
