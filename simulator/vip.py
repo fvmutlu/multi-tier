@@ -68,7 +68,7 @@ class VIPNode(Node):
 
     def addCache(self, cache):
         super().addCache(cache)
-        self.virtual_caches.append([])
+        self.virtual_caches.append(set())
 
     def addFIB(self, fib, dist_diff=None):
         super().addFIB(fib, dist_diff)
@@ -154,12 +154,12 @@ class VIPNode(Node):
         for k in range(self.num_objects):
             self.cache_scores[k] = self.vip_rx_windows[k].mean
 
-        cache_score_ranks = [i for i in np.argsort(self.cache_scores)][::-1]
+        cache_score_ranks = np.flip(np.argsort(self.cache_scores))
         temp_idx = 0
         for j, cache in enumerate(self.caches):
-            self.virtual_caches[j] = cache_score_ranks[
-                temp_idx : temp_idx + cache.capacity
-            ].copy()
+            self.virtual_caches[j].update(
+                cache_score_ranks[temp_idx : temp_idx + cache.capacity]
+            )
             temp_idx += cache.capacity
 
     def vipProcess(self):
@@ -318,6 +318,5 @@ class MVIPNode(VIPNode):
         # Assign objects to virtual cache
         for i, k in zip(row_ind, col_ind):
             if cost_matrix[i][k] >= 0:
-                v_cache = self.virtual_caches[self.tier_mapping[i]]
-                v_cache.append(k)
+                self.virtual_caches[self.tier_mapping[i]].add(k)
                 self.virtual_object_locs[k] = self.tier_mapping[i]
