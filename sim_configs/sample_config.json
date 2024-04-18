@@ -9,13 +9,13 @@
     "request_rate"           : [15],
     "request_dist_param"     : [0.75],
     "request_dist_type"      : ["zipf"],
-    "pen_weight"             : [0],
+    "pen_weight"             : [0, 4, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100],
     "vip_inc"                : [1],
     "vip_slot_len"           : [1],
     "vip_win_size"           : [100],
-    "cache_capacities"       : [[5,100]],
-    "cache_read_rates"       : [[20,10]],
-    "cache_write_rates"      : [[20,10]],
-    "cache_read_pens"        : [[4,2]],
-    "cache_write_pens"       : [[2,1]]
+    "cache_capacities"       : [[5]],
+    "cache_read_rates"       : [[20]],
+    "cache_write_rates"      : [[20]],
+    "cache_read_pens"        : [[4]],
+    "cache_write_pens"       : [[2]]
 }

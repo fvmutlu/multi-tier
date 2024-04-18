@@ -5,6 +5,7 @@ from scipy.stats import zipfian
 import networkx as nx
 
 # Builtin imports
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Tuple
@@ -14,42 +15,6 @@ from hashlib import sha256
 from .policies import *
 from .vip import *
 from .utils import convertListFieldsToTuples, namedProduct
-
-LOGGING_CONFIG = {
-    "version": 1,
-    "disable_existing_loggers": True,
-    "formatters": {
-        "standard": {
-            "format": "[%(asctime)s %(filename)s] %(levelname)s : %(message)s",
-            "datefmt": "%Y-%m-%d %H:%M:%S",
-        },
-    },
-    "handlers": {
-        "default": {
-            "level": "WARNING",
-            "formatter": "standard",
-            "class": "logging.StreamHandler",
-            "stream": "ext://sys.stdout",
-        },
-        "simulator": {
-            "level": "INFO",
-            "formatter": "standard",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": "./sim_outputs/simulator.log",
-            "maxBytes": 10000,
-            "backupCount": 3,
-            "delay": True,
-        },
-    },
-    "loggers": {
-        "": {"handlers": ["default"], "level": "WARNING", "propagate": False},
-        "siminfo": {
-            "handlers": ["default", "simulator"],
-            "level": "INFO",
-            "propagate": False,
-        },
-    },
-}
 
 
 @dataclass(eq=True, frozen=True)

@@ -22,10 +22,10 @@ from .helpers import (
     assignSources,
     assignRouting,
     offlineRequestGenerator,
-    simConfigToParamSets,
-    LOGGING_CONFIG,
+    simConfigToParamSets
 )
 from .utils import NpEncoder, namedZip, timeDiffPrinter
+from .logutils import LOGGING_CONFIG, rootlogger
 
 # Argument parsing
 parser = argparse.ArgumentParser()
@@ -40,12 +40,12 @@ config_mutex_group.add_argument("--config_url", type=str, dest="config_path")
 parser.set_defaults(config_path="./sim_configs/sample_config.json")
 args = parser.parse_args()
 
-logging.config.dictConfig(LOGGING_CONFIG)
-if args.logging:
-    logger = logging.getLogger("siminfo")
-else:
-    logger = logging.getLogger()
-
+#logging.config.dictConfig(LOGGING_CONFIG)
+#if args.logging:
+#    logger = logging.getLogger("siminfo")
+#else:
+#    logger = logging.getLogger()
+logger = rootlogger
 if isfile(args.config_path):
     with open(args.config_path, "r") as f:
         test_config = json.loads(f.read())
