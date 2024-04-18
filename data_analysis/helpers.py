@@ -3,7 +3,7 @@ import numpy as np
 
 # Builtin imports
 import json
-from typing import List, Callable
+from typing import List, Tuple, Callable, Any
 from copy import copy
 
 # Internal imports
@@ -11,27 +11,27 @@ from simulator.helpers import SimulationParameters, simConfigToParamSets
 from simulator.topologies import topologies
 
 
-def filterParamList(
-    config_path: str, filter_key: str, filter_value, filter_func: Callable
-):
+def filterParamList(config_path: str, filters: List[Tuple[str, Any, Callable]]):
     with open(config_path, "r") as f:
         test_config = json.loads(f.read())
     param_list = simConfigToParamSets(test_config)
-    if filter_func:
-        param_list = [
-            params
-            for params in param_list
-            if filter_func(params[filter_key]) == filter_value
-        ]
-    else:
-        param_list = [
-            params for params in param_list if params[filter_key] == filter_value
-        ]
-
+    for filter_key, filter_value, filter_func in filters:
+        if filter_func:
+            param_list = [
+                params
+                for params in param_list
+                if filter_func(params[filter_key]) == filter_value
+            ]
+        else:
+            param_list = [
+                params for params in param_list if params[filter_key] == filter_value
+            ]
     return param_list
 
 
-def getCustomParamList(base: SimulationParameters, variant_key: str, variant_list: List):
+def getCustomParamList(
+    base: SimulationParameters, variant_key: str, variant_list: List
+):
     sim_param_list = []
     for var in variant_list:
         sim_param_list.append(
