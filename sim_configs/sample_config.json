@@ -1,6 +1,6 @@
 {
-    "fwd_pol"                : ["lrt","mvip"],
-    "cache_pol"              : ["lfu","mvip"],
+    "fwd_pol"                : ["lrt"],
+    "cache_pol"              : ["fifo"],
     "num_objects"            : [1000],
     "source_read_rate"       : [1000],
     "source_map_seed"        : [1],

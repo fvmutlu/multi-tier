@@ -2,7 +2,7 @@
 import simpy as sp
 
 # Builtin imports
-from collections import namedtuple
+from collections import namedtuple, deque
 
 
 class Permastore(object):
@@ -158,3 +158,58 @@ class Cache(object):
 
     def getStats(self):
         return self.stats
+
+
+class FIFOCache(Cache):
+    def __init__(
+        self,
+        env: sp.Environment,
+        cap: int,
+        read_rate: int | float,
+        write_rate: int | float,
+        read_pen: int | float,
+        write_pen: int | float,
+    ):
+        super().__init__(env, cap, read_rate, write_rate, read_pen, write_pen)
+        self.contents = deque(maxlen=self.capacity)
+
+    def cacheObject(self, object_id):
+        if self.isFull():
+            print(
+                f"TIME: {self.env.now} ERROR: Algorithm error while trying to cache object {object_id}: cache already full."
+            )
+            raise IndexError("Cache full")
+        elif self.isCached(object_id):
+            return True
+        else:
+            self.stats["writes"] += 1
+            self.contents.append(object_id)
+            self.cur_size += 1
+            task = CacheTask(type="w", object_id=object_id)
+            self.task_queue.put(task)
+            return True
+
+    def replaceObject(self, evicted_object_id, cached_object_id):
+        if not self.isFull():
+            print(
+                f"TIME: {self.env.now} ERROR: Algorithm error while trying to replace: cache not full."
+            )
+        if self.isCached(evicted_object_id):
+            if self.contents[0] != evicted_object_id:
+                print(
+                    f"TIME: {self.env.now} ERROR: FIFO error while trying to evict object {evicted_object_id}: object not first in."
+                )
+            self.stats["replacements"] += 1
+            self.contents.popleft()
+            task = CacheTask(type="r", object_id=evicted_object_id)
+            self.task_queue.put(task)
+            self.contents.append(cached_object_id)
+            task = CacheTask(type="w", object_id=cached_object_id)
+            self.task_queue.put(task)
+            obj = yield self.out_buffer.get()
+            return obj
+        else:
+            print(
+                f"TIME: {self.env.now} ERROR: Algorithm error while trying to evict object {evicted_object_id}: object not in cache."
+            )
+            raise IndexError(f"Object {evicted_object_id} not in cache.")

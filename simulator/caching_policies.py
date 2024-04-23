@@ -6,6 +6,7 @@ import numpy as np
 # Internal imports
 from .node import Node
 from .utils import wique
+from .cache import FIFOCache
 
 
 class LRUNode(Node):
@@ -70,8 +71,29 @@ class WLFUNode(Node):
 
 # TODO: FIFO is currently broken due to cache.contents having been rewritten as a set
 class FIFONode(Node):
+    def addCache(self, cache):
+        fifocache = FIFOCache(
+            self.env,
+            cache.capacity,
+            cache.read_rate,
+            cache.write_rate,
+            cache.read_penalty,
+            cache.write_penalty,
+        )
+        if self.has_caches:
+            for j, existing_cache in enumerate(self.caches):
+                if fifocache.read_rate >= existing_cache.read_rate:
+                    self.caches.insert(j, fifocache)
+                    break
+            if j == len(self.caches) - 1:
+                self.caches.append(fifocache)
+        else:
+            self.caches = [fifocache]
+            self.has_caches = True
+        self.env.process(fifocache.cacheController())
+
     def decideCaching(self, object_id):
-        for cache in self.caches:
+        for j, cache in enumerate(self.caches):
             if cache.isFull():
                 victim_id = cache.contents[0]
                 yield self.env.process(cache.replaceObject(victim_id, object_id))
