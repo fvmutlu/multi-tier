@@ -123,7 +123,7 @@ def singleEntrySumDataFieldAcrossNodes(top_name: str, db_entry: dict, key: str):
         )
 
 
-def getDataFieldSumsAcrossEntries(top_name: str, db: dict, entry_hashes: str, key: str):
+def getDataFieldSumsAcrossEntries(top_name: str, db: dict, entry_hashes: List[str], key: str):
     return [
         singleEntrySumDataFieldAcrossNodes(top_name, db[hash], key)
         for hash in entry_hashes
