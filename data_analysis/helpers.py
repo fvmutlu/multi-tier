@@ -5,10 +5,17 @@ import numpy as np
 import json
 from typing import List, Tuple, Callable, Any
 from copy import copy
+from itertools import product
 
 # Internal imports
 from simulator.helpers import SimulationParameters, simConfigToParamSets
 from simulator.topologies import topologies
+
+
+def getJsonDb(db_filepath: str) -> dict:
+    db_file = open(db_filepath, "r")
+    db = json.loads(db_file.read())
+    return db
 
 
 def filterParamList(config_path: str, filters: List[Tuple[str, Any, Callable]]):
@@ -27,6 +34,60 @@ def filterParamList(config_path: str, filters: List[Tuple[str, Any, Callable]]):
                 params for params in param_list if params[filter_key] == filter_value
             ]
     return param_list
+
+
+def avgDataFieldSumsAcrossSeeds(
+    top_name: str, db: dict, param_list: List[SimulationParameters], key: str
+):
+    groups = []
+    while param_list:
+        current_dict = param_list.pop(0)
+        group = [current_dict]
+        i = 0
+        while i < len(param_list):
+            other_dict = param_list[i]
+            if all(
+                current_dict[key] == other_dict[key]
+                for key in current_dict.keys()
+                if key != "source_map_seed" and key != "request_generator_seed"
+            ):
+                group.append(other_dict)
+                param_list.pop(i)
+            else:
+                i += 1
+        groups.append(group)
+
+    averages = []
+    for group in groups:
+        group_hashes = getParamHashList(group)
+        group_sums = getDataFieldSumsAcrossEntries(top_name, db, group_hashes, key)
+        averages.append(sum(group_sums) / len(group_sums))
+
+    return averages
+
+
+def getParamHashList(param_list: List[SimulationParameters]):
+    return [str(hash(sp)) for sp in param_list]
+
+
+def singleEntrySumDataFieldAcrossNodes(top_name: str, db_entry: dict, key: str):
+    num_nodes = topologies[top_name]["num_nodes"]
+    if isinstance(db_entry["data"]["0"][key], (int, float)):
+        return sum([db_entry["data"][str(node)][key] for node in range(num_nodes)])
+    elif isinstance(db_entry["data"]["0"][key], (list, tuple)):
+        return np.sum(
+            np.array([db_entry["data"][str(node)][key] for node in range(num_nodes)]),
+            axis=0,
+        )
+
+
+def getDataFieldSumsAcrossEntries(
+    top_name: str, db: dict, entry_hashes: List[str], key: str
+):
+    return [
+        singleEntrySumDataFieldAcrossNodes(top_name, db[hash], key)
+        for hash in entry_hashes
+    ]
 
 
 def getCustomParamList(
@@ -100,31 +161,3 @@ def getCustomParamList(
             )
         )
     return sim_param_list
-
-
-def getParamHashList(param_list: List[SimulationParameters]):
-    return [str(hash(sp)) for sp in param_list]
-
-
-def getJsonDb(db_filepath: str) -> dict:
-    db_file = open(db_filepath, "r")
-    db = json.loads(db_file.read())
-    return db
-
-
-def singleEntrySumDataFieldAcrossNodes(top_name: str, db_entry: dict, key: str):
-    num_nodes = topologies[top_name]["num_nodes"]
-    if isinstance(db_entry["data"]["0"][key], (int, float)):
-        return sum([db_entry["data"][str(node)][key] for node in range(num_nodes)])
-    elif isinstance(db_entry["data"]["0"][key], (list, tuple)):
-        return np.sum(
-            np.array([db_entry["data"][str(node)][key] for node in range(num_nodes)]),
-            axis=0,
-        )
-
-
-def getDataFieldSumsAcrossEntries(top_name: str, db: dict, entry_hashes: List[str], key: str):
-    return [
-        singleEntrySumDataFieldAcrossNodes(top_name, db[hash], key)
-        for hash in entry_hashes
-    ]
