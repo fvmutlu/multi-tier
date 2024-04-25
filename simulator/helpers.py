@@ -32,8 +32,8 @@ class SimulationParameters:
     pen_weight: int = 0
     vip_inc: int = 1
     vip_slot_len: int = 1
-    vip_win_size: int = 30
-    cache_capacities: Tuple[int] = (10, 100)
+    vip_win_size: int = 100
+    cache_capacities: Tuple[int] = (5, 100)
     cache_read_rates: Tuple[int] = (20, 10)
     cache_write_rates: Tuple[int] = (20, 10)
     cache_read_pens: Tuple[int] = (2, 1)
