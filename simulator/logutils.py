@@ -36,5 +36,19 @@ LOGGING_CONFIG = {
         },
     },
 }
+
+class NonRepetitiveLogger(logging.Logger):
+    def __init__(self, name, level=logging.NOTSET):
+        super().__init__(name=name, level=level)
+        self._message_cache = []
+
+    def _log(self, level, msg, args, exc_info=None, extra=None, stack_info=False):
+        msg_hash = hash(msg)
+        if msg_hash in self._message_cache:
+            return
+        self._message_cache.append(msg_hash)
+        super()._log(level, msg, args, exc_info, extra, stack_info)
+
 logging.config.dictConfig(LOGGING_CONFIG)
-rootlogger = logging.getLogger()
+
+rootlogger = NonRepetitiveLogger("test")
