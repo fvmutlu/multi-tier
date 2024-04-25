@@ -70,7 +70,7 @@ class VIPNode(Node):
     def addCache(self, cache):
         if self.has_caches:
             rootlogger.warning(
-                "More than one cache added to base VIPNode object."
+                "More than one cache added to single tier VIP node."
                 + " Only the fastest cache tier will be used."
             )
         super().addCache(cache)

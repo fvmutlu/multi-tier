@@ -69,7 +69,6 @@ class WLFUNode(Node):
                 self.lfu_table[k] = self.lfu_windows[k].mean
 
 
-# TODO: FIFO is currently broken due to cache.contents having been rewritten as a set
 class FIFONode(Node):
     def addCache(self, cache):
         fifocache = FIFOCache(

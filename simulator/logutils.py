@@ -6,7 +6,7 @@ LOGGING_CONFIG = {
     "disable_existing_loggers": True,
     "formatters": {
         "standard": {
-            "format": "[%(asctime)s %(filename)s] %(levelname)s : %(message)s",
+            "format": "[%(asctime)s PID:%(process)d %(filename)s::%(funcName)s::%(lineno)s] %(levelname)s : %(message)s",
             "datefmt": "%Y-%m-%d %H:%M:%S",
         },
     },
@@ -29,6 +29,7 @@ LOGGING_CONFIG = {
     },
     "loggers": {
         "": {"handlers": ["default"], "level": "WARNING", "propagate": False},
+        "mylogger": {"handlers": ["default"], "level": "WARNING", "propagate": False},
         "siminfo": {
             "handlers": ["default", "simulator"],
             "level": "INFO",
@@ -36,6 +37,7 @@ LOGGING_CONFIG = {
         },
     },
 }
+
 
 class NonRepetitiveLogger(logging.Logger):
     def __init__(self, name, level=logging.NOTSET):
@@ -49,6 +51,8 @@ class NonRepetitiveLogger(logging.Logger):
         self._message_cache.append(msg_hash)
         super()._log(level, msg, args, exc_info, extra, stack_info)
 
+
+logging.setLoggerClass(NonRepetitiveLogger)
 logging.config.dictConfig(LOGGING_CONFIG)
 
-rootlogger = NonRepetitiveLogger("test")
+rootlogger = logging.getLogger("mylogger")

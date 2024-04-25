@@ -117,8 +117,16 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
             return LRTPALFUNode(
                 env, node_id, kwargs["num_objects"], kwargs["pen_weight"]
             )
-        case "svip", cache_pol if cache_pol in ["svip", "none"]:
+        case "vip", cache_pol if cache_pol in ["vip", "none"]:
             return VIPNode(
+                env,
+                node_id,
+                kwargs["num_objects"],
+                kwargs["pen_weight"],
+                **kwargs["vip_args"],
+            )
+        case "vip2", cache_pol if cache_pol in ["vip2", "none"]:
+            return VIP2Node(
                 env,
                 node_id,
                 kwargs["num_objects"],
@@ -144,7 +152,7 @@ def ignoreDudFilter(params):
     # of fwd/cache policies; except the "none" cache policy can be matched with
     # any fwd policy
     if (
-        params["cache_pol"] in ["svip", "mvip"]
+        params["cache_pol"] in ["vip", "vip2", "mvip"]
         and params["fwd_pol"] != params["cache_pol"]
     ) or (
         params["cache_pol"] in ["lru", "lfu", "unif", "fifo", "palfu"]
