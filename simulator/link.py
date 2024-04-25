@@ -48,7 +48,7 @@ def getLink(env, link_cap, prop_delay):
 
 
 def getCtrlLink(env, fwd_pol, cache_pol, **kwargs):
-    if fwd_pol == "svip" or fwd_pol == "mvip":
+    if fwd_pol in ["vip", "vip2", "mvip"]:
         return VipLink(env)
     else:
         return None

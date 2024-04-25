@@ -9,6 +9,7 @@ from collections import defaultdict
 from .caching_policies import *
 from .forwarding_policies import *
 from .utils import wique, invertDict, resetDict
+from .logutils import rootlogger
 
 
 class VIPNode(Node):
@@ -67,8 +68,13 @@ class VIPNode(Node):
                 self.receiveData(pkt.request)
 
     def addCache(self, cache):
+        if self.has_caches:
+            rootlogger.warning(
+                "More than one cache added to single tier VIP node."
+                + " Only the fastest cache tier will be used."
+            )
         super().addCache(cache)
-        self.virtual_caches.append([])
+        self.virtual_caches.append(set())
 
     def addFIB(self, fib, dist_diff=None):
         super().addFIB(fib, dist_diff)
@@ -113,15 +119,15 @@ class VIPNode(Node):
     def decideCaching(self, object_id):
         if self.cache_scores[object_id] <= 0:
             return
-        for cache in self.caches:
-            if cache.isFull():
-                victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
-                if self.cache_scores[object_id] > self.cache_scores[victim_id]:
-                    yield self.env.process(cache.replaceObject(victim_id, object_id))
-                    object_id = victim_id
-            else:
-                cache.cacheObject(object_id)
-                return
+        cache = self.caches[0]
+        if cache.isFull():
+            victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
+            if self.cache_scores[object_id] > self.cache_scores[victim_id]:
+                yield self.env.process(cache.replaceObject(victim_id, object_id))
+                object_id = victim_id
+        else:
+            cache.cacheObject(object_id)
+            return
 
     def vipForwarding(self):
         for k in range(self.num_objects):
@@ -151,16 +157,17 @@ class VIPNode(Node):
         return fwd_vips
 
     def vipCaching(self):
+        cache, virtual_cache = self.caches[0], self.virtual_caches[0]
         for k in range(self.num_objects):
-            self.cache_scores[k] = self.vip_rx_windows[k].mean
+            self.cache_scores[k] = cache.read_rate * self.vip_counts[k]
+            if k in virtual_cache:
+                self.cache_scores[k] += self.pw * cache.read_penalty
+            else:
+                self.cache_scores[k] -= self.pw * cache.write_penalty
 
-        cache_score_ranks = [i for i in np.argsort(self.cache_scores)][::-1]
-        temp_idx = 0
-        for j, cache in enumerate(self.caches):
-            self.virtual_caches[j] = cache_score_ranks[
-                temp_idx : temp_idx + cache.capacity
-            ].copy()
-            temp_idx += cache.capacity
+        cache_score_ranks = np.flip(np.argsort(self.cache_scores))
+        virtual_cache.clear()
+        virtual_cache.update(cache_score_ranks[: cache.capacity])
 
     def vipProcess(self):
         while True:
@@ -231,6 +238,24 @@ class VIPNode(Node):
             self.stats["pit_count_sum"].append(sum([len(q) for q in self.pit.values()]))
 
 
+class VIP2Node(VIPNode):
+    def vipCaching(self):
+        for k in range(self.num_objects):
+            self.cache_scores[k] = self.vip_rx_windows[k].mean
+
+        cache, virtual_cache = self.caches[0], self.virtual_caches[0]
+        for k in range(self.num_objects):
+            self.cache_scores[k] = cache.read_rate * self.cache_scores[k]
+            if k in virtual_cache:
+                self.cache_scores[k] += self.pw * cache.read_penalty
+            else:
+                self.cache_scores[k] -= self.pw * cache.write_penalty
+
+        cache_score_ranks = np.flip(np.argsort(self.cache_scores))
+        virtual_cache.clear()
+        virtual_cache.update(cache_score_ranks[: cache.capacity])
+
+
 class MVIPNode(VIPNode):
     def __init__(self, env, node_id, num_objects, pen_weight, **vip_args):
         super().__init__(env, node_id, num_objects, pen_weight, **vip_args)
@@ -238,7 +263,8 @@ class MVIPNode(VIPNode):
         self.tier_mapping, self.tier_slices = [], []
 
     def addCache(self, cache):
-        super().addCache(cache)
+        Node.addCache(self, cache)
+        self.virtual_caches.append(set())
         self.tier_mapping += [len(self.caches) - 1] * cache.capacity
         if self.tier_slices:
             end_of_last_slice = self.tier_slices[-1].stop
@@ -318,6 +344,5 @@ class MVIPNode(VIPNode):
         # Assign objects to virtual cache
         for i, k in zip(row_ind, col_ind):
             if cost_matrix[i][k] >= 0:
-                v_cache = self.virtual_caches[self.tier_mapping[i]]
-                v_cache.append(k)
+                self.virtual_caches[self.tier_mapping[i]].add(k)
                 self.virtual_object_locs[k] = self.tier_mapping[i]

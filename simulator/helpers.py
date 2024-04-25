@@ -5,6 +5,7 @@ from scipy.stats import zipfian
 import networkx as nx
 
 # Builtin imports
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Tuple
@@ -14,42 +15,6 @@ from hashlib import sha256
 from .policies import *
 from .vip import *
 from .utils import convertListFieldsToTuples, namedProduct
-
-LOGGING_CONFIG = {
-    "version": 1,
-    "disable_existing_loggers": True,
-    "formatters": {
-        "standard": {
-            "format": "[%(asctime)s %(filename)s] %(levelname)s : %(message)s",
-            "datefmt": "%Y-%m-%d %H:%M:%S",
-        },
-    },
-    "handlers": {
-        "default": {
-            "level": "WARNING",
-            "formatter": "standard",
-            "class": "logging.StreamHandler",
-            "stream": "ext://sys.stdout",
-        },
-        "simulator": {
-            "level": "INFO",
-            "formatter": "standard",
-            "class": "logging.handlers.RotatingFileHandler",
-            "filename": "./sim_outputs/simulator.log",
-            "maxBytes": 10000,
-            "backupCount": 3,
-            "delay": True,
-        },
-    },
-    "loggers": {
-        "": {"handlers": ["default"], "level": "WARNING", "propagate": False},
-        "siminfo": {
-            "handlers": ["default", "simulator"],
-            "level": "INFO",
-            "propagate": False,
-        },
-    },
-}
 
 
 @dataclass(eq=True, frozen=True)
@@ -152,8 +117,16 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
             return LRTPALFUNode(
                 env, node_id, kwargs["num_objects"], kwargs["pen_weight"]
             )
-        case "svip", cache_pol if cache_pol in ["svip", "none"]:
+        case "vip", cache_pol if cache_pol in ["vip", "none"]:
             return VIPNode(
+                env,
+                node_id,
+                kwargs["num_objects"],
+                kwargs["pen_weight"],
+                **kwargs["vip_args"],
+            )
+        case "vip2", cache_pol if cache_pol in ["vip2", "none"]:
+            return VIP2Node(
                 env,
                 node_id,
                 kwargs["num_objects"],
@@ -176,10 +149,10 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
 # Filter to eliminate certain combination of parameters that are not meaningful
 def ignoreDudFilter(params):
     # Rule 1: VIP type fwd/cache policies should only match with the same type
-    # of fwd/cache policies; except the "none" cache policy can be matched with
-    # any fwd policy
+    # of fwd/cache policies, except for the "none" cache policy which can be matched
+    # with any fwd policy.
     if (
-        params["cache_pol"] in ["svip", "mvip"]
+        params["cache_pol"] in ["vip", "vip2", "mvip"]
         and params["fwd_pol"] != params["cache_pol"]
     ) or (
         params["cache_pol"] in ["lru", "lfu", "unif", "fifo", "palfu"]
@@ -205,6 +178,14 @@ def ignoreDudFilter(params):
         np.shape(params["cache_capacities"]) == (0,) and params["cache_pol"] != "none"
     ) or (
         np.shape(params["cache_capacities"]) != (0,) and params["cache_pol"] == "none"
+    ):
+        return False
+
+    # Rule 4: Single tier VIP type cache policies should only match with
+    # cache parameters that express a single cache tier.
+    if (
+        params["cache_pol"] in ["vip", "vip2"]
+        and np.shape(params["cache_capacities"]) != (1,)
     ):
         return False
 
