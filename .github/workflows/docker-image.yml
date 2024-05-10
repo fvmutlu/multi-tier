@@ -30,3 +30,21 @@ jobs:
           push: true
           tags: ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
+  run-experiments:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Pull Docker image
+        run: docker pull ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+      - name: Run sample experiment and upload result
+        run: |
+          mkdir -p ~/artifacts
+          mkdir -p ~/artifacts/sim_outputs
+          docker run -v ~/artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }} python3 -m simulator.sim_runner
+          tar -czf ~/artifacts/sim_outputs.tar.gz ~/artifacts/sim_outputs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sim-outputs
+          path: ~/artifacts/sim_outputs.tar.gz
+          
+
