@@ -117,30 +117,32 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
             return LRTPALFUNode(
                 env, node_id, kwargs["num_objects"], kwargs["pen_weight"]
             )
-        case "vip", cache_pol if cache_pol in ["vip", "none"]:
-            return VIPNode(
-                env,
-                node_id,
-                kwargs["num_objects"],
-                kwargs["pen_weight"],
-                **kwargs["vip_args"],
-            )
-        case "vip2", cache_pol if cache_pol in ["vip2", "none"]:
-            return VIP2Node(
-                env,
-                node_id,
-                kwargs["num_objects"],
-                kwargs["pen_weight"],
-                **kwargs["vip_args"],
-            )
-        case "mvip", cache_pol if cache_pol in ["mvip", "none"]:
-            return MVIPNode(
-                env,
-                node_id,
-                kwargs["num_objects"],
-                kwargs["pen_weight"],
-                **kwargs["vip_args"],
-            )
+        case "vip", cache_pol if cache_pol in ["none","vip","vip2","mvip"]:
+            match cache_pol:
+                case cache_pol if cache_pol in ["none","vip"]:            
+                    return VIPNode(
+                        env,
+                        node_id,
+                        kwargs["num_objects"],
+                        kwargs["pen_weight"],
+                        **kwargs["vip_args"],
+                    )
+                case "vip2":
+                    return VIP2Node(
+                        env,
+                        node_id,
+                        kwargs["num_objects"],
+                        kwargs["pen_weight"],
+                        **kwargs["vip_args"],
+                    )
+                case "mvip":
+                    return MVIPNode(
+                        env,
+                        node_id,
+                        kwargs["num_objects"],
+                        kwargs["pen_weight"],
+                        **kwargs["vip_args"],
+                    )
         case _, _:
             print("fwd_pol: {}, cache_pol: {}".format(fwd_pol, cache_pol))
             raise ValueError("No node with the specified policies exist.")
@@ -153,7 +155,7 @@ def ignoreDudFilter(params):
     # with any fwd policy.
     if (
         params["cache_pol"] in ["vip", "vip2", "mvip"]
-        and params["fwd_pol"] != params["cache_pol"]
+        and params["fwd_pol"] != "vip"
     ) or (
         params["cache_pol"] in ["lru", "lfu", "unif", "fifo", "palfu"]
         and params["fwd_pol"] not in ["sp", "rr", "lrt"]

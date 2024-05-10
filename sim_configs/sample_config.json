@@ -1,6 +1,6 @@
 {
-    "fwd_pol"                : ["lrt","vip","vip2","mvip"],
-    "cache_pol"              : ["lru","lfu","unif","fifo","vip","vip2","mvip"],
+    "fwd_pol"                : ["lrt","vip"],
+    "cache_pol"              : ["lru","lfu","unif","fifo","vip2","mvip"],
     "num_objects"            : [1000],
     "source_read_rate"       : [1000],
     "source_map_seed"        : [1],
@@ -13,9 +13,9 @@
     "vip_inc"                : [1],
     "vip_slot_len"           : [1],
     "vip_win_size"           : [100],
-    "cache_capacities"       : [[5,100]],
-    "cache_read_rates"       : [[20,10]],
-    "cache_write_rates"      : [[20,10]],
-    "cache_read_pens"        : [[4,2]],
-    "cache_write_pens"       : [[2,1]]
+    "cache_capacities"       : [[5],[5,100]],
+    "cache_read_rates"       : [[20],[20,10]],
+    "cache_write_rates"      : [[20],[20,10]],
+    "cache_read_pens"        : [[0],[0,0]],
+    "cache_write_pens"       : [[0],[0,0]]
 }
