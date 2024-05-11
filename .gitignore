@@ -137,6 +137,7 @@ sim_outputs/*
 sim_configs/*
 !sim_configs/README.md
 !sim_configs/sample_config.json
+!sim_configs/ct_configs/
 
 # Notebooks
 notebooks/*

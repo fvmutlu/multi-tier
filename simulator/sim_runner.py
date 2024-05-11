@@ -40,11 +40,6 @@ config_mutex_group.add_argument("--config_url", type=str, dest="config_path")
 parser.set_defaults(config_path="./sim_configs/sample_config.json")
 args = parser.parse_args()
 
-#logging.config.dictConfig(LOGGING_CONFIG)
-#if args.logging:
-#    logger = logging.getLogger("siminfo")
-#else:
-#    logger = logging.getLogger()
 logger = rootlogger
 if isfile(args.config_path):
     with open(args.config_path, "r") as f:
@@ -240,7 +235,6 @@ logger.info(
 
 data_collection = {}
 for i, params in enumerate(param_set):  # Per param set
-    # param_hash = sha256(repr(params).encode()).hexdigest()[:8]
     param_hash = hash(params)
     data_collection[param_hash] = {
         "parameters": {**params},

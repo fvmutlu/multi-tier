@@ -1,0 +1,21 @@
+{
+    "fwd_pol"                : ["lrt","vip"],
+    "cache_pol"              : ["lfu","vip2"],
+    "num_objects"            : [1000],
+    "source_read_rate"       : [1000],
+    "source_map_seed"        : [1],
+    "request_generator_seed" : [1],
+    "stop_time"              : [50,100,150,200],
+    "request_rate"           : [15],
+    "request_dist_param"     : [0.75],
+    "request_dist_type"      : ["zipf"],
+    "pen_weight"             : [0],
+    "vip_inc"                : [1],
+    "vip_slot_len"           : [1],
+    "vip_win_size"           : [100],
+    "cache_capacities"       : [[5]],
+    "cache_read_rates"       : [[25]],
+    "cache_write_rates"      : [[25]],
+    "cache_read_pens"        : [[0]],
+    "cache_write_pens"       : [[0]]
+}
