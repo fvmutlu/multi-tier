@@ -41,10 +41,9 @@ jobs:
           mkdir -p ~/artifacts
           mkdir -p ~/artifacts/sim_outputs
           docker run -v ~/artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m simulator.sim_runner
-          tar -czf ~/artifacts/sim_outputs.tar.gz ~/artifacts/sim_outputs
       - uses: actions/upload-artifact@v4
         with:
           name: sim-outputs
-          path: ~/artifacts/sim_outputs.tar.gz
+          path: ~/artifacts/sim_outputs
           
 
