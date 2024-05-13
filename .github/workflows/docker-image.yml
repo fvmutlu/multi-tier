@@ -42,7 +42,7 @@ jobs:
           mkdir -p ~/artifacts
           mkdir -p ~/artifacts/sim_outputs
           docker run -v ~/artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m simulator.sim_runner
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v3
         with:
           name: sim-outputs
           path: ~/artifacts/sim_outputs

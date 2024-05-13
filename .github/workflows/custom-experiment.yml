@@ -42,5 +42,5 @@ jobs:
               docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m simulator.sim_runner -e=${{ inputs.name }} -t=${{ inputs.topology }} --config_url=${{ inputs.config_url }}
           - uses: actions/upload-artifact@v3
             with:
-              name: st_req_rate
+              name: experiment-outputs
               path: ~/actions-artifacts/sim_outputs/${{ inputs.name }}*
