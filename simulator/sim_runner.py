@@ -45,7 +45,7 @@ if isfile(args.config_path):
     with open(args.config_path, "r") as f:
         test_config = json.loads(f.read())
 else:
-    response = urlopen(args.config_url)
+    response = urlopen(args.config_path)
     test_config = json.loads(response.read())
 
 logger.info("Config read, setting up simulation.")

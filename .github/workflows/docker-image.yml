@@ -3,6 +3,7 @@ name: Docker Image CI
 on:
   push:
     branches: [ "main" ]
+    paths: [ "simulator/**" ]
 
 env:
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
