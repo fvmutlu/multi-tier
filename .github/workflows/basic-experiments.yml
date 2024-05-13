@@ -16,30 +16,30 @@ env:
 
 jobs:
     run-st-req-rate:
-        runs-on: ubuntu-latest
+        runs-on: self-hosted
         steps:
           - name: Pull Docker image
-            run: docker pull ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            run: docker pull ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
           - name: Run st_req_rate experiment and upload result
             run: |
               mkdir -p ~/artifacts
               mkdir -p ~/artifacts/sim_outputs
-              docker run -v ~/artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }} python3 -m simulator.sim_runner -e=st_req_rate -t=${{ inputs.topology }} --config_local=./sim_configs/ct_configs/st_req_rate_config.json
+              docker run -v ~/artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m simulator.sim_runner -e=st_req_rate -t=${{ inputs.topology }} --config_local=./sim_configs/ct_configs/st_req_rate_config.json
               tar -czf ~/artifacts/st_req_rate.tar.gz ~/artifacts/sim_outputs
           - uses: actions/upload-artifact@v4
             with:
               name: st_req_rate
               path: ~/artifacts/st_req_rate.tar.gz
     run-st-cache-size:
-        runs-on: ubuntu-latest
+        runs-on: self-hosted
         steps:
           - name: Pull Docker image
-            run: docker pull ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+            run: docker pull ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
           - name: Run st_cache_size experiment and upload result
             run: |
                 mkdir -p ~/artifacts
                 mkdir -p ~/artifacts/sim_outputs
-                docker run -v ~/artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }} python3 -m simulator.sim_runner -e=st_cache_size -t=${{ inputs.topology }} --config_local=./sim_configs/ct_configs/st_cache_size_config.json
+                docker run -v ~/artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m simulator.sim_runner -e=st_cache_size -t=${{ inputs.topology }} --config_local=./sim_configs/ct_configs/st_cache_size_config.json
                 tar -czf ~/artifacts/st_cache_size.tar.gz ~/artifacts/sim_outputs
           - uses: actions/upload-artifact@v4
             with:
