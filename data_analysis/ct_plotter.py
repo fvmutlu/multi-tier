@@ -1,59 +1,84 @@
+# External package imports
 import matplotlib.pyplot as plt
+
+
+# Builtin package imports
+import argparse
+
+# Internal imports
 from .helpers import *
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-e", "--experiment_name", type=str, default="sample")
+parser.add_argument("-t", "--topology", type=str, default="abilene")
+args = parser.parse_args()
 
-def plotter(experiment_name):
-    config_path = "./sim_configs/ct_configs/" + experiment_name + "_config.json"
-    db_path = "./sim_outputs/" + experiment_name + "_abilene_db.json"
-    db = getJsonDb(db_path)
 
-    variant_a = []
-    field_of_interest = "delay"
+experiment_name = args.experiment_name
+topology = args.topology
+config_path = "./sim_configs/ct_configs/" + experiment_name + "_config.json"
+db_path = "./sim_outputs/" + experiment_name + "_" + topology + "_db.json"
+db = getJsonDb(db_path)
 
-    # Modify this code block as more experiments are added
-    variant_b = []
+x_label, curve_label = "", ""
+x_variant, curve_variant = [], []
+metric = ""
 
-    if experiment_name not in ["st_cache_size", "st_req_rate", "st_zipf_param"]:
-        field_of_interest = "delay"
-
-    match experiment_name:
-        case "st_cache_size":
-            variant_label, variant_a = "cache size", [5, 6, 7, 8, 9, 10]
-        case _:
-            pass
-
-    if experiment_name in ["st_cache_size", "st_req_rate", "st_zipf_param"]:
-        vip_filters = [("cache_pol", "vip2", None)]
-        lfu_filters = [("cache_pol", "lfu", None)]
-    else:
+match experiment_name:
+    case "st_cache_size":
+        x_label, x_variant = "cache_capacities", [5, 6, 7, 8, 9, 10]
+        metric = "delay"
+    case "st_req_rate":
+        x_label, x_variant = "request_rate", [5, 10, 15, 20, 25]
+        curve_label, curve_variant = "cache_capacities", [(5,)]
+        metric = "delay"
+    case "st_zipf_param":
+        x_label, x_variant = "zipf_param", [0.5, 0.625, 0.75, 0.875]
+        curve_label, curve_variant = "cache_capacities", [(5,), (10,)]
+        metric = "delay"
+    case _:
         pass
-    # End of code block
-
-    vip_param_list = filterParamList(config_path, vip_filters)
-    vip_param_hashes = getParamHashList(vip_param_list)
-    lfu_param_list = filterParamList(config_path, lfu_filters)
-    lfu_param_hashes = getParamHashList(lfu_param_list)
-
-    vip_res = getDataFieldSumsAcrossEntries(
-        "abilene", db, vip_param_hashes, field_of_interest
-    )
-    lfu_res = getDataFieldSumsAcrossEntries(
-        "abilene", db, lfu_param_hashes, field_of_interest
-    )
-
-    fig, ax = plt.subplots()
-
-    ax.plot(variant_a, vip_res, label="VIP")
-    ax.plot(variant_a, lfu_res, label="LFU")
-
-    ax.set_title(experiment_name)
-    ax.set_xlabel(variant_label)
-    ax.set_ylabel(field_of_interest)
-    ax.ticklabel_format(axis="y", style="sci", scilimits=(0, 0))
-    ax.legend(["VIP", "LFU"])
-
-    plt.savefig("./sim_outputs/" + experiment_name + ".pdf")
 
 
-#experiments = ["st_cache_size", "st_req_rate", "st_zipf_param"]
-plotter("st_cache_size")
+fig, ax = plt.subplots()
+legend = []
+
+def plotter(filters, label, config_path=config_path, topology=topology, db=db, metric=metric, ax=ax):
+    param_list = filterParamList(config_path, filters)
+    param_hashes = getParamHashList(param_list)
+    res = getDataFieldSumsAcrossEntries(topology, db, param_hashes, metric)
+    ax.plot(x_variant, res, label=label)
+
+vip_filters = [("cache_pol", "vip2", None)]
+lfu_filters = [("cache_pol", "lfu", None)]
+if curve_variant:
+    vip_filters.append(())
+    lfu_filters.append(())
+    for curve in curve_variant:
+        # VIP plot
+        label = "VIP, " + curve_label + " " + str(curve)
+        legend.append(label)
+        vip_filters[1] = (curve_label, curve, None)
+        plotter(vip_filters, label)
+        # LFU plot
+        label = "LFU, " + curve_label + " " + str(curve)
+        legend.append(label)
+        lfu_filters[1] = (curve_label, curve, None)
+        plotter(lfu_filters, label)
+else:
+    # VIP plot
+    label = "VIP"
+    legend.append(label)
+    plotter(vip_filters, label)
+    # LFU plot
+    label = "LFU"
+    legend.append(label)
+    plotter(lfu_filters, label)
+
+ax.set_title(experiment_name + " on " + topology)
+ax.set_xlabel(x_label)
+ax.set_ylabel(metric)
+ax.ticklabel_format(axis="y", style="sci", scilimits=(0, 0))
+ax.legend(legend)
+
+plt.savefig("./sim_outputs/" + experiment_name + "_" + topology + ".pdf")
