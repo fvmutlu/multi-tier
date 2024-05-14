@@ -45,6 +45,7 @@ env:
 jobs:   
     run-custom-experiment:
         runs-on: ${{ inputs.runner }}
+        timeout-minutes: 1200
         steps:
           - name: Pull Docker image
             run: docker pull ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
