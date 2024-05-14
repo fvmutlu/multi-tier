@@ -58,7 +58,7 @@ def plotter(
 ):
     param_list = filterParamList(config_path, filters)
     res = avgDataFieldSumsAcrossSeeds(topology, db, param_list, metric)
-    ax.plot(x_variant, res, label=label)
+    ax.plot(list(map(str,x_variant)), res, label=label)
 
 
 for cache_pol in test_config["cache_pol"]:
