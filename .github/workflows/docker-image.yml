@@ -3,7 +3,7 @@ name: Docker Image CI
 on:
   push:
     branches: [ "main" ]
-    paths: [ "simulator/**", "data_analysis/ct_plotter.py", "Dockerfile", "requirements.txt" ]
+    paths: [ "simulator/**", "sim_configs/ct_configs/**", "data_analysis/ct_plotter.py", "Dockerfile", "requirements.txt" ]
 
 env:
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}

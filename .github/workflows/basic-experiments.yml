@@ -61,7 +61,7 @@ jobs:
             run: |
                 mkdir -p ~/actions-artifacts
                 mkdir -p ~/actions-artifacts/sim_outputs
-                docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m simulator.sim_runner -e=st_zipf_param -t=${{ inputs.topology }} --config_local=./sim_configs/ct_configs/st_cache_size_config.json
+                docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m simulator.sim_runner -e=st_zipf_param -t=${{ inputs.topology }} --config_local=./sim_configs/ct_configs/st_zipf_param_config.json
                 docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m data_analysis.ct_plotter -e=st_zipf_param -t=${{ inputs.topology }}
           - uses: actions/upload-artifact@v3
             with:
