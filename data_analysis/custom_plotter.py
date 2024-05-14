@@ -61,31 +61,19 @@ def plotter(
     ax.plot(x_variant, res, label=label)
 
 
-vip_filters = [("cache_pol", "vip2", None)]
-lfu_filters = [("cache_pol", "lfu", None)]
-if curve_variant:
-    vip_filters.append(())
-    lfu_filters.append(())
-    for curve in curve_variant:
-        # VIP plot
-        label = "VIP, " + curve_label + " " + str(curve)
+for cache_pol in test_config["cache_pol"]:
+    filters = [("cache_pol", cache_pol, None)]
+    if curve_variant:
+        filters.append(())
+        for curve in curve_variant:
+            label = cache_pol + ", " + curve_label + " " + str(curve)
+            legend.append(label)
+            filters[1] = (curve_label, curve, None)
+            plotter(filters, label)
+    else:
+        label = cache_pol
         legend.append(label)
-        vip_filters[1] = (curve_label, curve, None)
-        plotter(vip_filters, label)
-        # LFU plot
-        label = "LFU, " + curve_label + " " + str(curve)
-        legend.append(label)
-        lfu_filters[1] = (curve_label, curve, None)
-        plotter(lfu_filters, label)
-else:
-    # VIP plot
-    label = "VIP"
-    legend.append(label)
-    plotter(vip_filters, label)
-    # LFU plot
-    label = "LFU"
-    legend.append(label)
-    plotter(lfu_filters, label)
+        plotter(filters, label)
 
 ax.set_title(experiment_name + " on " + topology)
 ax.set_xlabel(x_label)
