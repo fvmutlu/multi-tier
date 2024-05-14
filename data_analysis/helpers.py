@@ -6,10 +6,22 @@ import json
 from typing import List, Tuple, Callable, Any
 from copy import copy
 from itertools import product
+from os.path import isfile
+from urllib.request import urlopen
 
 # Internal imports
 from simulator.helpers import SimulationParameters, simConfigToParamSets
 from simulator.topologies import topologies
+
+
+def getTestConfig(config_path: str):
+    if isfile(config_path):
+        with open(config_path, "r") as f:
+            test_config = json.loads(f.read())
+    else:
+        response = urlopen(config_path)
+        test_config = json.loads(response.read())
+    return test_config
 
 
 def getJsonDb(db_filepath: str) -> dict:
@@ -19,8 +31,7 @@ def getJsonDb(db_filepath: str) -> dict:
 
 
 def filterParamList(config_path: str, filters: List[Tuple[str, Any, Callable]]):
-    with open(config_path, "r") as f:
-        test_config = json.loads(f.read())
+    test_config = getTestConfig(config_path)
     param_list = simConfigToParamSets(test_config)
     for filter_key, filter_value, filter_func in filters:
         if filter_func:

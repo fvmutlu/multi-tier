@@ -1,7 +1,6 @@
 # External package imports
 import matplotlib.pyplot as plt
 
-
 # Builtin package imports
 import argparse
 
@@ -11,33 +10,38 @@ from .helpers import *
 parser = argparse.ArgumentParser()
 parser.add_argument("-e", "--experiment_name", type=str, default="sample")
 parser.add_argument("-t", "--topology", type=str, default="abilene")
+parser.add_argument("--x_label", type=str)
+parser.add_argument("--curve_label", type=str, default="")
+parser.add_argument("--metric", type=str)
+config_mutex_group = parser.add_mutually_exclusive_group()
+config_mutex_group.add_argument("--config_local", type=str, dest="config_path")
+config_mutex_group.add_argument("--config_url", type=str, dest="config_path")
+parser.set_defaults(config_path="./sim_configs/sample_config.json")
 args = parser.parse_args()
 
 
 experiment_name = args.experiment_name
 topology = args.topology
-config_path = "./sim_configs/ct_configs/" + experiment_name + "_config.json"
+
+config_path = args.config_path
+test_config = getTestConfig(config_path)
+
 db_path = "./sim_outputs/" + experiment_name + "_" + topology + "_db.json"
 db = getJsonDb(db_path)
 
-x_label, curve_label = "", ""
-x_variant, curve_variant = [], []
-metric = ""
+x_label, curve_label = args.x_label, args.curve_label
+metric = args.metric
 
-match experiment_name:
-    case "st_cache_size":
-        x_label, x_variant = "cache_capacities", [5, 6, 7, 8, 9, 10]
-        metric = "delay"
-    case "st_req_rate":
-        x_label, x_variant = "request_rate", [5, 10, 15, 20, 25]
-        metric = "delay"
-    case "st_zipf_param":
-        x_label, x_variant = "zipf_param", [0.5, 0.625, 0.75, 0.875]
-        curve_label, curve_variant = "cache_capacities", [(5,), (10,)]
-        metric = "delay"
-    case _:
-        pass
+x_variant = test_config[x_label]
+if isinstance(x_variant[0], list):
+    x_variant = list(map(tuple, x_variant))
 
+if curve_label:
+    curve_variant = test_config[curve_label]
+    if isinstance(curve_variant[0], list):
+        curve_variant = list(map(tuple, curve_variant))
+else:
+    curve_variant = []
 
 fig, ax = plt.subplots()
 legend = []
@@ -53,8 +57,7 @@ def plotter(
     ax=ax,
 ):
     param_list = filterParamList(config_path, filters)
-    param_hashes = getParamHashList(param_list)
-    res = getDataFieldSumsAcrossEntries(topology, db, param_hashes, metric)
+    res = avgDataFieldSumsAcrossSeeds(topology, db, param_list, metric)
     ax.plot(x_variant, res, label=label)
 
 

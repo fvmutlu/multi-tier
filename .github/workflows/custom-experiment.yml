@@ -10,12 +10,25 @@ on:
         topology:
             description: 'Network topology to use in experiment'
             required: true
-            default: 'abilene'
             type: string
+            default: 'abilene'
         config_url:
             description: 'URL that directs to raw JSON for experiment config'
             required: true
             type: string
+        x_label:
+            description: 'Parameter on the x-axis of output plot'
+            required: true
+            type: string
+        metric:
+            description: 'Metric on the y-axis of output plot'
+            required: true
+            type: string
+        curve_label:
+            description: '(Optional) Parameter to iterate different curves on the output plot'
+            required: false
+            type: string
+            default: ''
         runner:
             description: 'Which runner to send the job to'
             required: true
@@ -40,6 +53,7 @@ jobs:
               mkdir -p ~/actions-artifacts
               mkdir -p ~/actions-artifacts/sim_outputs
               docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m simulator.sim_runner -e=${{ inputs.name }} -t=${{ inputs.topology }} --config_url=${{ inputs.config_url }}
+              docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m data_analysis.custom_plotter -e=${{ inputs.name }} -t=${{ inputs.topology }} --config_url=${{ inputs.config_url }} --x_label=${{ inputs.x_label }} --metric=${{ inputs.metric }} --curve_label=${{ inputs.curve_label }}
           - uses: actions/upload-artifact@v3
             with:
               name: experiment-outputs
