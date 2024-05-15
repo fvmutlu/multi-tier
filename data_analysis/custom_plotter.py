@@ -59,7 +59,6 @@ def plotter(
 ):
     param_list = simConfigToParamSets(test_config)
     param_list = filterParamList(param_list, filters)
-    #res = avgDataFieldSumsAcrossSeeds(topology, db, param_list, metric)
     res = getDataFieldSumAvgsAcrossSeeds(topology, db, param_list, test_config["source_map_seed"], test_config["request_generator_seed"], metric)
     ax.plot(list(map(str, x_variant)), res, label=label)
 
