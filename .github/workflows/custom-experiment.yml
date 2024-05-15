@@ -3,6 +3,13 @@ name: Custom Experiment Run w/ URL Config
 on:
   workflow_dispatch:
     inputs:
+        runner:
+            description: 'Which runner to send the job to'
+            required: true
+            type: choice
+            options:
+            - ubuntu-latest
+            - self-hosted
         name:
             description: 'Experiment name'
             required: true
@@ -18,24 +25,17 @@ on:
             type: string
         x_label:
             description: 'Parameter on the x-axis of output plot'
-            required: true
+            required: false
             type: string
         metric:
             description: 'Metric on the y-axis of output plot'
-            required: true
+            required: false
             type: string
         curve_label:
             description: '(Optional) Parameter to iterate different curves on the output plot'
             required: false
             type: string
             default: ''
-        runner:
-            description: 'Which runner to send the job to'
-            required: true
-            type: choice
-            options:
-            - ubuntu-latest
-            - self-hosted
 
 env:
     DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
@@ -49,12 +49,14 @@ jobs:
         steps:
           - name: Pull Docker image
             run: docker pull ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
-          - name: Run experiment and upload result
+          - name: Run experiment
             run: |
               mkdir -p ~/actions-artifacts
               mkdir -p ~/actions-artifacts/sim_outputs
               docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m simulator.sim_runner -e=${{ inputs.name }} -t=${{ inputs.topology }} --config_url=${{ inputs.config_url }}
-              docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m data_analysis.custom_plotter -e=${{ inputs.name }} -t=${{ inputs.topology }} --config_url=${{ inputs.config_url }} --x_label=${{ inputs.x_label }} --metric=${{ inputs.metric }} --curve_label=${{ inputs.curve_label }}
+          - name: Plot results
+            continue-on-error: true
+            run: docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m data_analysis.custom_plotter -e=${{ inputs.name }} -t=${{ inputs.topology }} --config_url=${{ inputs.config_url }} --x_label=${{ inputs.x_label }} --metric=${{ inputs.metric }} --curve_label=${{ inputs.curve_label }}
           - uses: actions/upload-artifact@v3
             with:
               name: experiment-outputs
