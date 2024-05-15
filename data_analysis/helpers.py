@@ -48,7 +48,7 @@ def filterParamList(config_path: str, filters: List[Tuple[str, Any, Callable]]):
 
 
 def avgDataFieldSumsAcrossSeeds(
-    top_name: str, db: dict, param_list: List[SimulationParameters], key: str
+    top_name: str, db: dict, param_list: List[SimulationParameters], field: str
 ):
     groups = []
     while param_list:
@@ -71,8 +71,8 @@ def avgDataFieldSumsAcrossSeeds(
     averages = []
     for group in groups:
         group_hashes = getParamHashList(group)
-        group_sums = getDataFieldSumsAcrossEntries(top_name, db, group_hashes, key)
-        averages.append(sum(group_sums) / len(group_sums))
+        group_sums = getDataFieldSumsAcrossEntries(top_name, db, group_hashes, field)
+        averages.append(np.mean(group_sums, axis=0))
 
     return averages
 
