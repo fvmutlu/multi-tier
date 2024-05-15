@@ -17,6 +17,7 @@ args = parser.parse_args()
 experiment_name = args.experiment_name
 topology = args.topology
 config_path = "./sim_configs/ct_configs/" + experiment_name + "_config.json"
+test_config = getTestConfig(config_path)
 db_path = "./sim_outputs/" + experiment_name + "_" + topology + "_db.json"
 db = getJsonDb(db_path)
 
@@ -46,13 +47,14 @@ legend = []
 def plotter(
     filters,
     label,
-    config_path=config_path,
+    test_config=test_config,
     topology=topology,
     db=db,
     metric=metric,
     ax=ax,
 ):
-    param_list = filterParamList(config_path, filters)
+    param_list = simConfigToParamSets(test_config)
+    param_list = filterParamList(param_list, filters)
     param_hashes = getParamHashList(param_list)
     res = getDataFieldSumsAcrossEntries(topology, db, param_hashes, metric)
     ax.plot(x_variant, res, label=label)

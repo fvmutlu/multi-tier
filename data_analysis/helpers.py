@@ -4,7 +4,7 @@ import numpy as np
 # Builtin imports
 import json
 from typing import List, Tuple, Callable, Any
-from copy import copy
+from copy import copy, deepcopy
 from itertools import product
 from os.path import isfile
 from urllib.request import urlopen
@@ -30,9 +30,8 @@ def getJsonDb(db_filepath: str) -> dict:
     return db
 
 
-def filterParamList(config_path: str, filters: List[Tuple[str, Any, Callable]]):
-    test_config = getTestConfig(config_path)
-    param_list = simConfigToParamSets(test_config)
+def filterParamList(input_param_list: List[SimulationParameters], filters: List[Tuple[str, Any, Callable]]):
+    param_list = deepcopy(input_param_list)
     for filter_key, filter_value, filter_func in filters:
         if filter_func:
             param_list = [
@@ -46,6 +45,44 @@ def filterParamList(config_path: str, filters: List[Tuple[str, Any, Callable]]):
             ]
     return param_list
 
+
+def getParamHashList(param_list: List[SimulationParameters]):
+    return [str(hash(sp)) for sp in param_list]
+
+
+def singleEntrySumDataFieldAcrossNodes(top_name: str, db_entry: dict, field: str):
+    num_nodes = topologies[top_name]["num_nodes"]
+    if isinstance(db_entry["data"]["0"][field], (int, float)):
+        return sum([db_entry["data"][str(node)][field] for node in range(num_nodes)])
+    elif isinstance(db_entry["data"]["0"][field], (list, tuple)):
+        return np.sum(
+            np.array([db_entry["data"][str(node)][field] for node in range(num_nodes)]),
+            axis=0,
+        )
+
+
+def getDataFieldSumsAcrossEntries(
+    top_name: str, db: dict, entry_hashes: List[str], field: str
+):
+    return [
+        singleEntrySumDataFieldAcrossNodes(top_name, db[hash], field)
+        for hash in entry_hashes
+    ]
+
+def getDataFieldSumAvgsAcrossSeeds(
+        top_name: str, db: dict, param_list: List[SimulationParameters], source_map_seeds: List[int], request_generator_seeds: List[int], field: str
+):
+    num_runs = len(source_map_seeds) * len(request_generator_seeds)
+    running_sum = np.array([0] * (len(param_list) // num_runs))
+    for source_map_seed in source_map_seeds:
+        for request_generator_seed in request_generator_seeds:
+            run_filters = [("source_map_seed", source_map_seed, None),("request_generator_seed", request_generator_seed, None)]
+            run_param_list = filterParamList(param_list, run_filters)
+            run_param_hashes = getParamHashList(run_param_list)
+            running_sum = np.add(running_sum, getDataFieldSumsAcrossEntries(top_name, db, run_param_hashes, field))
+    return running_sum / num_runs
+
+    
 
 def avgDataFieldSumsAcrossSeeds(
     top_name: str, db: dict, param_list: List[SimulationParameters], field: str
@@ -75,30 +112,6 @@ def avgDataFieldSumsAcrossSeeds(
         averages.append(np.mean(group_sums, axis=0))
 
     return averages
-
-
-def getParamHashList(param_list: List[SimulationParameters]):
-    return [str(hash(sp)) for sp in param_list]
-
-
-def singleEntrySumDataFieldAcrossNodes(top_name: str, db_entry: dict, key: str):
-    num_nodes = topologies[top_name]["num_nodes"]
-    if isinstance(db_entry["data"]["0"][key], (int, float)):
-        return sum([db_entry["data"][str(node)][key] for node in range(num_nodes)])
-    elif isinstance(db_entry["data"]["0"][key], (list, tuple)):
-        return np.sum(
-            np.array([db_entry["data"][str(node)][key] for node in range(num_nodes)]),
-            axis=0,
-        )
-
-
-def getDataFieldSumsAcrossEntries(
-    top_name: str, db: dict, entry_hashes: List[str], key: str
-):
-    return [
-        singleEntrySumDataFieldAcrossNodes(top_name, db[hash], key)
-        for hash in entry_hashes
-    ]
 
 
 def getCustomParamList(

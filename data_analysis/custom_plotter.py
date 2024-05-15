@@ -50,15 +50,17 @@ legend = []
 def plotter(
     filters,
     label,
-    config_path=config_path,
+    test_config=test_config,
     topology=topology,
     db=db,
     metric=metric,
     ax=ax,
     x_variant=x_variant,
 ):
-    param_list = filterParamList(config_path, filters)
-    res = avgDataFieldSumsAcrossSeeds(topology, db, param_list, metric)
+    param_list = simConfigToParamSets(test_config)
+    param_list = filterParamList(param_list, filters)
+    #res = avgDataFieldSumsAcrossSeeds(topology, db, param_list, metric)
+    res = getDataFieldSumAvgsAcrossSeeds(topology, db, param_list, test_config["source_map_seed"], test_config["request_generator_seed"], metric)
     ax.plot(list(map(str, x_variant)), res, label=label)
 
 
