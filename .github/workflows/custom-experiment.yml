@@ -59,7 +59,7 @@ jobs:
             run: docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m data_analysis.custom_plotter -e=${{ inputs.name }} -t=${{ inputs.topology }} --config_url=${{ inputs.config_url }} --x_label=${{ inputs.x_label }} --metric=${{ inputs.metric }} --curve_label=${{ inputs.curve_label }}
           - name: Get current date and time
             id: date-time
-            run: echo "DATETIME=$(date +'%Y-%m-%d_%H:%M')" >> "$GITHUB_OUTPUT"
+            run: echo "DATETIME=$(date +'%Y-%m-%d_%H-%M')" >> "$GITHUB_OUTPUT"
           - uses: actions/upload-artifact@v3
             with:
               name: ${{ inputs.name }}-${{ inputs.topology }}-outputs-${{ steps.date-time.outputs.DATETIME }}
