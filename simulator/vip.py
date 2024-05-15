@@ -40,8 +40,8 @@ class VIPNode(Node):
         self.req_timestamps = {}
 
         # Additional stats relating to VIP
-        self.stats["vip_count_sum"] = []
-        self.stats["pit_count_sum"] = []
+        #self.stats["vip_count_sum"] = []
+        #self.stats["pit_count_sum"] = []
 
         # Init VIP process
         self.env.process(self.vipProcess())
@@ -234,8 +234,8 @@ class VIPNode(Node):
                         )
 
             # Update VIP stats
-            self.stats["vip_count_sum"].append(sum(self.vip_counts))
-            self.stats["pit_count_sum"].append(sum([len(q) for q in self.pit.values()]))
+            # self.stats["vip_count_sum"].append(sum(self.vip_counts))
+            # self.stats["pit_count_sum"].append(sum([len(q) for q in self.pit.values()]))
 
 
 class VIP2Node(VIPNode):
