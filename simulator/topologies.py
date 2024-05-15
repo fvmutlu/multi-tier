@@ -98,6 +98,7 @@ topologies = {
         "cache_nodes": [],
         "requester_nodes": [],
         "top_args": {
+            "num_nodes": 16,
             "rows": 4,
             "cols": 4
         }

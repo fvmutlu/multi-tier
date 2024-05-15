@@ -51,7 +51,12 @@ def getParamHashList(param_list: List[SimulationParameters]):
 
 
 def singleEntrySumDataFieldAcrossNodes(top_name: str, db_entry: dict, field: str):
-    num_nodes = topologies[top_name]["num_nodes"]
+    if "num_nodes" in topologies[top_name].keys():
+        num_nodes = topologies[top_name]["num_nodes"]
+    elif "num_nodes" in topologies[top_name]["top_args"].keys():
+        num_nodes = topologies[top_name]["top_args"]["num_nodes"]
+    else:
+        print("Topology has no parameter num_nodes")
     if isinstance(db_entry["data"]["0"][field], (int, float)):
         return sum([db_entry["data"][str(node)][field] for node in range(num_nodes)])
     elif isinstance(db_entry["data"]["0"][field], (list, tuple)):
