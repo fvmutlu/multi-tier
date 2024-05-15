@@ -63,4 +63,4 @@ jobs:
           - uses: actions/upload-artifact@v3
             with:
               name: ${{ inputs.name }}-${{ inputs.topology }}-outputs-${{ steps.date-time.outputs.DATETIME }}
-              path: ~/actions-artifacts/sim_outputs/${{ inputs.name }}*
+              path: ~/actions-artifacts/sim_outputs/${{ inputs.name }}_${{ inputs.topology }}*
