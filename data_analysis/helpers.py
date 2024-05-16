@@ -30,7 +30,10 @@ def getJsonDb(db_filepath: str) -> dict:
     return db
 
 
-def filterParamList(input_param_list: List[SimulationParameters], filters: List[Tuple[str, Any, Callable]]):
+def filterParamList(
+    input_param_list: List[SimulationParameters],
+    filters: List[Tuple[str, Any, Callable]],
+):
     param_list = deepcopy(input_param_list)
     for filter_key, filter_value, filter_func in filters:
         if filter_func:
@@ -61,7 +64,7 @@ def singleEntrySumDataFieldAcrossNodes(top_name: str, db_entry: dict, field: str
         return sum([db_entry["data"][str(node)][field] for node in range(num_nodes)])
     elif isinstance(db_entry["data"]["0"][field], (list, tuple)):
         return np.sum(
-            np.array([db_entry["data"][str(node)][field] for node in range(num_nodes)]),
+            [db_entry["data"][str(node)][field] for node in range(num_nodes)],
             axis=0,
         )
 
@@ -69,25 +72,49 @@ def singleEntrySumDataFieldAcrossNodes(top_name: str, db_entry: dict, field: str
 def getDataFieldSumsAcrossEntries(
     top_name: str, db: dict, entry_hashes: List[str], field: str
 ):
-    return [
-        singleEntrySumDataFieldAcrossNodes(top_name, db[hash], field)
-        for hash in entry_hashes
-    ]
+    return np.array(
+        [
+            singleEntrySumDataFieldAcrossNodes(top_name, db[hash], field)
+            for hash in entry_hashes
+        ]
+    )
+
 
 def getDataFieldSumAvgsAcrossSeeds(
-        top_name: str, db: dict, param_list: List[SimulationParameters], source_map_seeds: List[int], request_generator_seeds: List[int], field: str
+    top_name: str,
+    db: dict,
+    param_list: List[SimulationParameters],
+    source_map_seeds: List[int],
+    request_generator_seeds: List[int],
+    field: str,
 ):
     num_runs = len(source_map_seeds) * len(request_generator_seeds)
-    running_sum = np.array([0] * (len(param_list) // num_runs))
+    # running_sum = np.array([0] * (len(param_list) // num_runs))
+    accumulator = None
     for source_map_seed in source_map_seeds:
         for request_generator_seed in request_generator_seeds:
-            run_filters = [("source_map_seed", source_map_seed, None),("request_generator_seed", request_generator_seed, None)]
+            run_filters = [
+                ("source_map_seed", source_map_seed, None),
+                ("request_generator_seed", request_generator_seed, None),
+            ]
             run_param_list = filterParamList(param_list, run_filters)
             run_param_hashes = getParamHashList(run_param_list)
-            running_sum = np.add(running_sum, getDataFieldSumsAcrossEntries(top_name, db, run_param_hashes, field))
-    return running_sum / num_runs
+            # running_sum = np.add(running_sum, getDataFieldSumsAcrossEntries(top_name, db, run_param_hashes, field))
+            if accumulator:
+                accumulator = np.add(
+                    accumulator,
+                    getDataFieldSumsAcrossEntries(
+                        top_name, db, run_param_hashes, field
+                    ),
+                )
+            else:
+                accumulator = getDataFieldSumsAcrossEntries(
+                    top_name, db, run_param_hashes, field
+                )
 
-    
+    # return running_sum / num_runs
+    return accumulator / num_runs
+
 
 def avgDataFieldSumsAcrossSeeds(
     top_name: str, db: dict, param_list: List[SimulationParameters], field: str
