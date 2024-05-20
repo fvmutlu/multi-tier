@@ -190,6 +190,9 @@ def ignoreDudFilter(params):
         and np.shape(params["cache_capacities"]) != (1,)
     ):
         return False
+    
+    # Rule 5: Cache write rates should not exceed cache read rates
+
 
     # If no rules are violated, return True
     return True

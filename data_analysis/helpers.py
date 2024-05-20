@@ -89,7 +89,6 @@ def getDataFieldSumAvgsAcrossSeeds(
     field: str,
 ):
     num_runs = len(source_map_seeds) * len(request_generator_seeds)
-    # running_sum = np.array([0] * (len(param_list) // num_runs))
     accumulator = None
     for source_map_seed in source_map_seeds:
         for request_generator_seed in request_generator_seeds:
@@ -99,20 +98,18 @@ def getDataFieldSumAvgsAcrossSeeds(
             ]
             run_param_list = filterParamList(param_list, run_filters)
             run_param_hashes = getParamHashList(run_param_list)
-            # running_sum = np.add(running_sum, getDataFieldSumsAcrossEntries(top_name, db, run_param_hashes, field))
-            if accumulator:
+            if accumulator is None:
+                accumulator = getDataFieldSumsAcrossEntries(
+                    top_name, db, run_param_hashes, field
+                )
+            else:
                 accumulator = np.add(
                     accumulator,
                     getDataFieldSumsAcrossEntries(
                         top_name, db, run_param_hashes, field
                     ),
                 )
-            else:
-                accumulator = getDataFieldSumsAcrossEntries(
-                    top_name, db, run_param_hashes, field
-                )
-
-    # return running_sum / num_runs
+        
     return accumulator / num_runs
 
 
