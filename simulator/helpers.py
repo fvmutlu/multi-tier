@@ -117,7 +117,7 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
             return LRTPALFUNode(
                 env, node_id, kwargs["num_objects"], kwargs["pen_weight"]
             )
-        case "vip", cache_pol if cache_pol in ["none","vip","vip2","mvip"]:
+        case "vip", cache_pol if cache_pol in ["none","vip","vip2","vipsbw", "vipsbw2", "mvip"]:
             match cache_pol:
                 case cache_pol if cache_pol in ["none","vip"]:            
                     return VIPNode(
@@ -129,6 +129,22 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
                     )
                 case "vip2":
                     return VIP2Node(
+                        env,
+                        node_id,
+                        kwargs["num_objects"],
+                        kwargs["pen_weight"],
+                        **kwargs["vip_args"],
+                    )
+                case "vipsbw":
+                    return VIPSBWNode(
+                        env,
+                        node_id,
+                        kwargs["num_objects"],
+                        kwargs["pen_weight"],
+                        **kwargs["vip_args"],
+                    )
+                case "vipsbw2":
+                    return VIPSBW2Node(
                         env,
                         node_id,
                         kwargs["num_objects"],
@@ -154,7 +170,7 @@ def ignoreDudFilter(params):
     # of fwd/cache policies, except for the "none" cache policy which can be matched
     # with any fwd policy.
     if (
-        params["cache_pol"] in ["vip", "vip2", "mvip"]
+        params["cache_pol"] in ["vip", "vip2", "vipsbw", "vipsbw2", "mvip"]
         and params["fwd_pol"] != "vip"
     ) or (
         params["cache_pol"] in ["lru", "lfu", "unif", "fifo", "palfu"]
@@ -186,7 +202,7 @@ def ignoreDudFilter(params):
     # Rule 4: Single tier VIP type cache policies should only match with
     # cache parameters that express a single cache tier.
     if (
-        params["cache_pol"] in ["vip", "vip2"]
+        params["cache_pol"] in ["vip", "vip2", "vipsbw", "vipsbw2"]
         and np.shape(params["cache_capacities"]) != (1,)
     ):
         return False

@@ -240,12 +240,9 @@ class VIPNode(Node):
 
 class VIP2Node(VIPNode):
     def vipCaching(self):
-        for k in range(self.num_objects):
-            self.cache_scores[k] = self.vip_rx_windows[k].mean
-
         cache, virtual_cache = self.caches[0], self.virtual_caches[0]
         for k in range(self.num_objects):
-            self.cache_scores[k] = cache.read_rate * self.cache_scores[k]
+            self.cache_scores[k] = cache.read_rate * self.vip_rx_windows[k].mean
             if k in virtual_cache:
                 self.cache_scores[k] += self.pw * cache.read_penalty
             else:
@@ -255,6 +252,31 @@ class VIP2Node(VIPNode):
         virtual_cache.clear()
         virtual_cache.update(cache_score_ranks[: cache.capacity])
 
+class VIPSBWNode(VIPNode):
+    def vipCaching(self):
+        cache, virtual_cache = self.caches[0], self.virtual_caches[0]
+        for k in range(self.num_objects):
+            self.cache_scores[k] = cache.read_rate * self.vip_counts[k]
+            if k in virtual_cache:
+                self.cache_scores[k] += self.pw * cache.read_penalty
+            else:
+                self.cache_scores[k] -= self.pw * cache.write_penalty
+
+        virtual_cache.clear()
+        virtual_cache.add(np.argmax(self.cache_scores))
+
+class VIPSBW2Node(VIPNode):
+    def vipCaching(self):
+        cache, virtual_cache = self.caches[0], self.virtual_caches[0]
+        for k in range(self.num_objects):
+            self.cache_scores[k] = cache.read_rate * self.vip_rx_windows[k].mean
+            if k in virtual_cache:
+                self.cache_scores[k] += self.pw * cache.read_penalty
+            else:
+                self.cache_scores[k] -= self.pw * cache.write_penalty
+
+        virtual_cache.clear()
+        virtual_cache.add(np.argmax(self.cache_scores))
 
 class MVIPNode(VIPNode):
     def __init__(self, env, node_id, num_objects, pen_weight, **vip_args):
