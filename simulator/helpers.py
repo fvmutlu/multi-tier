@@ -192,6 +192,13 @@ def ignoreDudFilter(params):
         return False
     
     # Rule 5: Cache write rates should not exceed cache read rates
+    if any(
+        [
+            params["cache_write_rates"][i] > params["cache_read_rates"][i]
+            for i in range(len(params["cache_write_rates"]))
+        ]
+    ):
+        return False
 
 
     # If no rules are violated, return True
