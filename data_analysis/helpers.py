@@ -37,15 +37,27 @@ def filterParamList(
     param_list = deepcopy(input_param_list)
     for filter_key, filter_value, filter_func in filters:
         if filter_func:
-            param_list = [
-                params
-                for params in param_list
-                if filter_func(params[filter_key]) == filter_value
-            ]
+            if isinstance(filter_value, list):
+                param_list = [
+                    params
+                    for params in param_list
+                    if filter_func(params[filter_key]) in filter_value
+                ]
+            else:
+                param_list = [
+                    params
+                    for params in param_list
+                    if filter_func(params[filter_key]) == filter_value
+                ]
         else:
-            param_list = [
-                params for params in param_list if params[filter_key] == filter_value
-            ]
+            if isinstance(filter_value, list):
+                param_list = [
+                    params for params in param_list if params[filter_key] in filter_value
+                ]
+            else:
+                param_list = [
+                    params for params in param_list if params[filter_key] == filter_value
+                ]
     return param_list
 
 
