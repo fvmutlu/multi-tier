@@ -76,8 +76,8 @@ class VIPNode(Node):
         super().addCache(cache)
         self.virtual_caches.append(set())
 
-    def addFIB(self, fib, dist_diff=None):
-        super().addFIB(fib, dist_diff)
+    def addFIB(self, fib):
+        super().addFIB(fib)
         self.fib_inv = invertDict(fib)
         for object_id in fib:
             for remote_id in fib[object_id]:

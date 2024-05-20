@@ -45,9 +45,9 @@ class Network(object):
             for cache in caches:
                 self.nodes[node_id].addCache(Cache(self.env, **cache))
 
-    def installFIBs(self, fibs, dist_diffs=None):
+    def installFIBs(self, fibs):
         for node_id, node in enumerate(self.nodes):
-            node.addFIB(fibs[node_id], None)
+            node.addFIB(fibs[node_id])
 
     def initRequests(self, requester_nodes, requests):
         for node_id in requester_nodes:

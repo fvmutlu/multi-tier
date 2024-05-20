@@ -117,7 +117,7 @@ class Node(object):
             self.has_caches = True
         self.env.process(cache.cacheController())
 
-    def addFIB(self, fib, dist_diff=None):
+    def addFIB(self, fib):
         self.fib = fib
 
     def packetReceiver(self, remote_id):
