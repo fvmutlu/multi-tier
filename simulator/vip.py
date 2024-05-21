@@ -33,15 +33,14 @@ class VIPNode(Node):
         self.neighbor_vip_counts = {}
         self.neighbor_vip_tx = {}
         self.virtual_caches = []
-        self.vip_allocs = [[] for _ in range(self.num_objects)]
 
         # LRT in VIP to break ties
         self.link_delays = {}
         self.req_timestamps = {}
 
         # Additional stats relating to VIP
-        #self.stats["vip_count_sum"] = []
-        #self.stats["pit_count_sum"] = []
+        # self.stats["vip_count_sum"] = []
+        # self.stats["pit_count_sum"] = []
 
         # Init VIP process
         self.env.process(self.vipProcess())
@@ -130,31 +129,18 @@ class VIPNode(Node):
             return
 
     def vipForwarding(self):
-        for k in range(self.num_objects):
-            self.vip_allocs[k].clear()
-
-        fwd_vips = {}
+        vip_allocs = defaultdict(list)
 
         for b in self.fib_inv:
-            fwd_vips[b] = defaultdict(int)
             vip_diff = [
                 self.vip_counts[k] - self.neighbor_vip_counts[b][k]
                 for k in self.fib_inv[b]
             ]
             k_star_index = np.argmax(vip_diff)
             k_star = self.fib_inv[b][k_star_index]
-            self.vip_allocs[k_star].append((vip_diff[k_star_index], b))
+            vip_allocs[k_star].append((vip_diff[k_star_index], b))
 
-        for k in self.fib:
-            self.vip_allocs[k].sort(reverse=True)
-            while (self.vip_counts[k] > 0) and (self.vip_allocs[k]):
-                _, b = self.vip_allocs[k].pop(0)
-                vip_amount = min(
-                    self.slot_len * self.out_links[b].link_cap, self.vip_counts[k]
-                )
-                fwd_vips[b][k] = vip_amount
-
-        return fwd_vips
+        return vip_allocs
 
     def vipCaching(self):
         cache, virtual_cache = self.caches[0], self.virtual_caches[0]
@@ -187,11 +173,33 @@ class VIPNode(Node):
                 ].getUpdate()
 
             # Determine virtual plane forwarding
-            fwd_vips = self.vipForwarding()
+            vip_allocs = self.vipForwarding()
 
             # Determine virtual plane caching
             if self.has_caches:
                 self.vipCaching()
+
+            # Decrement VIP counts due to caching
+            if self.has_caches:
+                for j, cache in enumerate(self.caches):
+                    for k in self.virtual_caches[j]:
+                        self.vip_counts[k] = max(
+                            self.vip_counts[k] - self.slot_len * cache.read_rate, 0
+                        )
+
+            # Determine actual amount of VIPs that will be forwarded
+            fwd_vips = {}
+            for b in self.fib_inv:
+                fwd_vips[b] = defaultdict(int)
+
+            for k in self.fib:
+                vip_allocs[k].sort()
+                while (self.vip_counts[k] > 0) and (vip_allocs[k]):
+                    _, b = vip_allocs[k].pop()
+                    vip_amount = min(
+                        self.slot_len * self.out_links[b].link_cap, self.vip_counts[k]
+                    )
+                    fwd_vips[b][k] = vip_amount
 
             # Send VIPs
             for remote_id in self.ctrl_out_links:
@@ -225,14 +233,6 @@ class VIPNode(Node):
                 self.vip_rx_windows[k].append(self.vip_rx[k])
                 self.vip_rx[k] = 0
 
-            # Decrement VIP counts due to caching
-            if self.has_caches:
-                for j, cache in enumerate(self.caches):
-                    for k in self.virtual_caches[j]:
-                        self.vip_counts[k] = max(
-                            self.vip_counts[k] - self.slot_len * cache.read_rate, 0
-                        )
-
             # Update VIP stats
             # self.stats["vip_count_sum"].append(sum(self.vip_counts))
             # self.stats["pit_count_sum"].append(sum([len(q) for q in self.pit.values()]))
@@ -252,6 +252,7 @@ class VIP2Node(VIPNode):
         virtual_cache.clear()
         virtual_cache.update(cache_score_ranks[: cache.capacity])
 
+
 class VIPSBWNode(VIPNode):
     def vipCaching(self):
         cache, virtual_cache = self.caches[0], self.virtual_caches[0]
@@ -265,6 +266,7 @@ class VIPSBWNode(VIPNode):
         virtual_cache.clear()
         virtual_cache.add(np.argmax(self.cache_scores))
 
+
 class VIPSBW2Node(VIPNode):
     def vipCaching(self):
         cache, virtual_cache = self.caches[0], self.virtual_caches[0]
@@ -277,6 +279,7 @@ class VIPSBW2Node(VIPNode):
 
         virtual_cache.clear()
         virtual_cache.add(np.argmax(self.cache_scores))
+
 
 class MVIPNode(VIPNode):
     def __init__(self, env, node_id, num_objects, pen_weight, **vip_args):
