@@ -17,6 +17,7 @@ class VIPNode(Node):
         super().__init__(env, node_id)
         self.num_objects = num_objects
         self.pw = pen_weight
+        self.cacheable_objects = [object_id for object_id in range(self.num_objects)]
 
         # VIP Parameters
         self.vip_inc = vip_args["vip_inc"]
@@ -74,6 +75,14 @@ class VIPNode(Node):
             )
         super().addCache(cache)
         self.virtual_caches.append(set())
+
+    def addPermastore(self, permastore):
+        super().addPermastore(permastore)
+        self.cacheable_objects = [
+            object_id
+            for object_id in range(self.num_objects)
+            if object_id not in self.permastore.contents
+        ]
 
     def addFIB(self, fib):
         super().addFIB(fib)
@@ -144,16 +153,23 @@ class VIPNode(Node):
 
     def vipCaching(self):
         cache, virtual_cache = self.caches[0], self.virtual_caches[0]
-        for k in range(self.num_objects):
+        for k in self.cacheable_objects:
             self.cache_scores[k] = cache.read_rate * self.vip_counts[k]
             if k in virtual_cache:
                 self.cache_scores[k] += self.pw * cache.read_penalty
             else:
                 self.cache_scores[k] -= self.pw * cache.write_penalty
 
-        cache_score_ranks = np.flip(np.argsort(self.cache_scores))
+        # Sort from highest to lowest cache score
+        sorted_cache_scores = np.flip(np.sort(self.cache_scores))
+        # Obtain object ids for sorted scores
+        sorted_cache_scores_idx = np.flip(np.argsort(self.cache_scores))
+        # Find the index of the first zero score
+        first_zero_index = np.where(sorted_cache_scores == 0)[0][0]
+        # Cache up to either the first zero score object, or up to capacity
+        stop_index = min(first_zero_index, cache.capacity)
         virtual_cache.clear()
-        virtual_cache.update(cache_score_ranks[: cache.capacity])
+        virtual_cache.update(sorted_cache_scores_idx[: stop_index])
 
     def vipProcess(self):
         while True:
@@ -241,22 +257,29 @@ class VIPNode(Node):
 class VIP2Node(VIPNode):
     def vipCaching(self):
         cache, virtual_cache = self.caches[0], self.virtual_caches[0]
-        for k in range(self.num_objects):
+        for k in self.cacheable_objects:
             self.cache_scores[k] = cache.read_rate * self.vip_rx_windows[k].mean
             if k in virtual_cache:
                 self.cache_scores[k] += self.pw * cache.read_penalty
             else:
                 self.cache_scores[k] -= self.pw * cache.write_penalty
 
-        cache_score_ranks = np.flip(np.argsort(self.cache_scores))
+        # Sort from highest to lowest cache score
+        sorted_cache_scores = np.flip(np.sort(self.cache_scores))
+        # Obtain object ids for sorted scores
+        sorted_cache_scores_idx = np.flip(np.argsort(self.cache_scores))
+        # Find the index of the first zero score
+        first_zero_index = np.where(sorted_cache_scores == 0)[0][0]
+        # Cache up to either the first zero score object, or up to capacity
+        stop_index = min(first_zero_index, cache.capacity)
         virtual_cache.clear()
-        virtual_cache.update(cache_score_ranks[: cache.capacity])
+        virtual_cache.update(sorted_cache_scores_idx[: stop_index])
 
 
 class VIPSBWNode(VIPNode):
     def vipCaching(self):
         cache, virtual_cache = self.caches[0], self.virtual_caches[0]
-        for k in range(self.num_objects):
+        for k in self.cacheable_objects:
             self.cache_scores[k] = cache.read_rate * self.vip_counts[k]
             if k in virtual_cache:
                 self.cache_scores[k] += self.pw * cache.read_penalty
@@ -264,13 +287,15 @@ class VIPSBWNode(VIPNode):
                 self.cache_scores[k] -= self.pw * cache.write_penalty
 
         virtual_cache.clear()
-        virtual_cache.add(np.argmax(self.cache_scores))
+        max_score_object = np.argmax(self.cache_scores)
+        if self.cache_scores[max_score_object] > 0:
+            virtual_cache.add(max_score_object)
 
 
 class VIPSBW2Node(VIPNode):
     def vipCaching(self):
         cache, virtual_cache = self.caches[0], self.virtual_caches[0]
-        for k in range(self.num_objects):
+        for k in self.cacheable_objects:
             self.cache_scores[k] = cache.read_rate * self.vip_rx_windows[k].mean
             if k in virtual_cache:
                 self.cache_scores[k] += self.pw * cache.read_penalty
@@ -278,7 +303,9 @@ class VIPSBW2Node(VIPNode):
                 self.cache_scores[k] -= self.pw * cache.write_penalty
 
         virtual_cache.clear()
-        virtual_cache.add(np.argmax(self.cache_scores))
+        max_score_object = np.argmax(self.cache_scores)
+        if self.cache_scores[max_score_object] > 0:
+            virtual_cache.add(max_score_object)
 
 
 class MVIPNode(VIPNode):
@@ -332,7 +359,7 @@ class MVIPNode(VIPNode):
         # Initialize cost matrix, with shape J x k
         cost_matrix = np.zeros((total_cache_size, self.num_objects))
 
-        for k in range(self.num_objects):
+        for k in self.cacheable_objects:
             # Locate object
             object_loc = self.virtual_object_locs[k]
             # Update cache scores
@@ -359,15 +386,19 @@ class MVIPNode(VIPNode):
         # Run LSAP. Rows are cache spaces, columns are object ids.
         row_ind, col_ind = linear_sum_assignment(cost_matrix, maximize=True)
 
-        # Reset virtual object locs
-        self.virtual_object_locs = resetDict(self.virtual_object_locs, -2)
-
         # Clear virtual caches
         for v_cache in self.virtual_caches:
             v_cache.clear()
+
+        # Reset virtual object locs
+        self.virtual_object_locs = resetDict(self.virtual_object_locs, -2)
 
         # Assign objects to virtual cache
         for i, k in zip(row_ind, col_ind):
             if cost_matrix[i][k] >= 0:
                 self.virtual_caches[self.tier_mapping[i]].add(k)
                 self.virtual_object_locs[k] = self.tier_mapping[i]
+
+        if self.is_source:
+            for k in self.permastore.contents:
+                self.virtual_object_locs[k] = -1
