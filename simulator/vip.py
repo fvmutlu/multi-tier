@@ -137,7 +137,12 @@ class VIPNode(Node):
                 yield self.env.process(cache.replaceObject(victim_id, object_id))
                 object_id = victim_id
         else:
-            cache.cacheObject(object_id)
+            benefit = (
+                cache.read_rate * self.cache_scores[object_id]
+                - self.pw * cache.write_penalty
+            )
+            if benefit > 0:
+                cache.cacheObject(object_id)
             return
 
     def vipForwarding(self):
