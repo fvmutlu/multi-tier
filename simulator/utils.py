@@ -121,13 +121,14 @@ def invertDict(input_dict: dict):
     return dict(new_dict)
 
 
-def resetDict(input_dict: dict, default_value):
+def resetDict(input_dict: dict, default_value, keys=None):
     """
     Resets the values in a dictionary to a given default value.
 
     Args:
         input_dict: The input dictionary to be reset.
         default_value: Default value to reset every value in the dictionary to.
+        keys (optional): If supplied, only these keys will be reset
 
     Returns:
         dict: A new dictionary with the same keys as those of input_dict
@@ -139,7 +140,13 @@ def resetDict(input_dict: dict, default_value):
     >>> resetDict(input_dict, 0)
     {'a': 0, 'b': 0}
     """
-    return input_dict.fromkeys(input_dict, default_value)
+    if keys is None:
+        return input_dict.fromkeys(input_dict, default_value)
+    else:
+        copy_dict = dict(input_dict)
+        for key in keys:
+            copy_dict[key] = default_value
+        return copy_dict
 
 
 def convertListFieldsToTuples(dictionary):
