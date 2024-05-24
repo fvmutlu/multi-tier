@@ -49,8 +49,8 @@ class LFUNode(Node):
                 return
 
 
-class WLFUNode(Node):
-    def wlfuInit(self, num_objects):
+class WLFUNode(LFUNode):
+    def lfuInit(self, num_objects):
         self.lfu_table = [0] * num_objects
         self.lfu_counters = [0] * num_objects
         self.lfu_windows = [wique(maxlen=100) for _ in range(num_objects)]
@@ -58,7 +58,7 @@ class WLFUNode(Node):
 
     def receiveInterest(self, remote_id, request):
         self.lfu_counters[request.object_id] += 1
-        super().receiveInterest(remote_id, request)
+        Node.receiveInterest(self, remote_id, request)
 
     def wlfuProcess(self, num_objects):
         while True:
@@ -147,8 +147,8 @@ class PALFUNode(LFUNode):
                 self.caches[j].cacheObject(object_id)
 
 class PAWLFUNode(WLFUNode):
-    def wlfuInit(self, num_objects, pen_weight):
-        super().wlfuInit(num_objects)
+    def lfuInit(self, num_objects, pen_weight):
+        super().lfuInit(num_objects)
         self.pw = pen_weight
 
     def decideCaching(self, object_id):

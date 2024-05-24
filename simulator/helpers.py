@@ -121,9 +121,16 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
             return LRTPAWLFUNode(
                 env, node_id, kwargs["num_objects"], kwargs["pen_weight"]
             )
-        case "vip", cache_pol if cache_pol in ["none","vip","vip2","vipsbw", "vipsbw2", "mvip"]:
+        case "vip", cache_pol if cache_pol in [
+            "none",
+            "vip",
+            "vip2",
+            "vipsbw",
+            "vipsbw2",
+            "mvip",
+        ]:
             match cache_pol:
-                case cache_pol if cache_pol in ["none","vip"]:            
+                case cache_pol if cache_pol in ["none", "vip"]:
                     return VIPNode(
                         env,
                         node_id,
@@ -177,7 +184,7 @@ def ignoreDudFilter(params):
         params["cache_pol"] in ["vip", "vip2", "vipsbw", "vipsbw2", "mvip"]
         and params["fwd_pol"] != "vip"
     ) or (
-        params["cache_pol"] in ["lru", "lfu", "unif", "fifo", "palfu"]
+        params["cache_pol"] in ["lru", "lfu", "wlfu", "unif", "fifo", "palfu", "pawlfu"]
         and params["fwd_pol"] not in ["sp", "rr", "lrt"]
     ):
         return False
@@ -205,12 +212,11 @@ def ignoreDudFilter(params):
 
     # Rule 4: Single tier VIP type cache policies should only match with
     # cache parameters that express a single cache tier.
-    if (
-        params["cache_pol"] in ["vip", "vip2", "vipsbw", "vipsbw2"]
-        and np.shape(params["cache_capacities"]) != (1,)
-    ):
+    if params["cache_pol"] in ["vip", "vip2", "vipsbw", "vipsbw2"] and np.shape(
+        params["cache_capacities"]
+    ) != (1,):
         return False
-    
+
     # Rule 5: Cache write rates should not exceed cache read rates
     if any(
         [
@@ -220,13 +226,12 @@ def ignoreDudFilter(params):
     ):
         return False
 
-
     # If no rules are violated, return True
     return True
 
 
 def probDistGenerator(num_objects, dist_param=0.75, dist_type="zipf"):
-    if dist_type == "zipf":
+    if "zipf" in dist_type:
         return [
             zipfian.pmf(k, dist_param, num_objects) for k in range(1, num_objects + 1)
         ]
@@ -241,9 +246,17 @@ def offlineRequestGenerator(
     for node_id in nodes:
         intervals = []
         objects = []
+        shuffle_interval = 5
         while sum(intervals) < stop_time:
             intervals.append(rng.exponential(1 / rate))
             objects.append(rng.choice(arange(num_objects), p=prob_dist))
+            if (
+                shuffle_interval != 0
+                and sum(intervals) > (stop_time / shuffle_interval)
+                and "shuffle" in dist_type
+            ):
+                rng.shuffle(prob_dist)
+                shuffle_interval -= 1
         reqs[node_id] = {"intervals": intervals, "objects": objects}
     return reqs
 
