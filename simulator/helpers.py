@@ -117,6 +117,10 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
             return LRTPALFUNode(
                 env, node_id, kwargs["num_objects"], kwargs["pen_weight"]
             )
+        case "lrt", "pawlfu":
+            return LRTPAWLFUNode(
+                env, node_id, kwargs["num_objects"], kwargs["pen_weight"]
+            )
         case "vip", cache_pol if cache_pol in ["none","vip","vip2","vipsbw", "vipsbw2", "mvip"]:
             match cache_pol:
                 case cache_pol if cache_pol in ["none","vip"]:            

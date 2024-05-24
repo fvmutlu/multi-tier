@@ -71,3 +71,8 @@ class LRTPALFUNode(LeastResponseTimeNode, PALFUNode):
     def __init__(self, env, node_id, num_objects, pen_weight):
         super().__init__(env, node_id)
         self.lfuInit(num_objects, pen_weight)
+
+class LRTPAWLFUNode(LeastResponseTimeNode, PAWLFUNode):
+    def __init__(self, env, node_id, num_objects, pen_weight):
+        super().__init__(env, node_id)
+        self.wlfuInit(num_objects, pen_weight)

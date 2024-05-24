@@ -53,7 +53,7 @@ class WLFUNode(Node):
     def wlfuInit(self, num_objects):
         self.lfu_table = [0] * num_objects
         self.lfu_counters = [0] * num_objects
-        self.lfu_windows = [wique(maxlen=30) for _ in range(num_objects)]
+        self.lfu_windows = [wique(maxlen=100) for _ in range(num_objects)]
         self.env.process(self.wlfuProcess(num_objects))
 
     def receiveInterest(self, remote_id, request):
@@ -115,6 +115,40 @@ class UNIFNode(Node):
 class PALFUNode(LFUNode):
     def lfuInit(self, num_objects, pen_weight):
         super().lfuInit(num_objects)
+        self.pw = pen_weight
+
+    def decideCaching(self, object_id):
+        benefits = []
+        victims = []
+        for cache in self.caches:
+            r_nj = cache.read_rate
+            p_rj = self.pw * cache.read_penalty
+            p_wj = self.pw * cache.write_penalty
+            if cache.isFull():
+                victim_id = min(cache.contents, key=lambda k: self.lfu_table[k])
+                benefit = r_nj * (
+                    self.lfu_table[object_id] - self.lfu_table[victim_id]
+                ) - (p_rj + p_wj)
+                benefits.append(benefit)
+                victims.append(victim_id)
+            else:
+                benefit = r_nj * self.lfu_table[object_id] - p_wj
+                benefits.append(benefit)
+                victims.append(None)
+
+        j = np.argmax(benefits)
+        if benefits[j] > 0:
+            if victims[j] is not None:
+                yield self.env.process(
+                    self.caches[j].replaceObject(victims[j], object_id)
+                )
+                self.env.process(self.decideCaching(victims[j]))
+            else:
+                self.caches[j].cacheObject(object_id)
+
+class PAWLFUNode(WLFUNode):
+    def wlfuInit(self, num_objects, pen_weight):
+        super().wlfuInit(num_objects)
         self.pw = pen_weight
 
     def decideCaching(self, object_id):
