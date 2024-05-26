@@ -49,69 +49,6 @@ class LFUNode(Node):
                 return
 
 
-class WLFUNode(LFUNode):
-    def lfuInit(self, num_objects):
-        self.lfu_table = [0] * num_objects
-        self.lfu_counters = [0] * num_objects
-        self.lfu_windows = [wique(maxlen=100) for _ in range(num_objects)]
-        self.env.process(self.wlfuProcess(num_objects))
-
-    def receiveInterest(self, remote_id, request):
-        self.lfu_counters[request.object_id] += 1
-        Node.receiveInterest(self, remote_id, request)
-
-    def wlfuProcess(self, num_objects):
-        while True:
-            yield self.env.timeout(1)
-            for k in range(num_objects):
-                self.lfu_windows[k].append(self.lfu_counters[k])
-                self.lfu_counters[k] = 0
-                self.lfu_table[k] = self.lfu_windows[k].mean
-
-
-class FIFONode(Node):
-    def addCache(self, cache):
-        fifocache = FIFOCache(
-            self.env,
-            cache.capacity,
-            cache.read_rate,
-            cache.write_rate,
-            cache.read_penalty,
-            cache.write_penalty,
-        )
-        if self.has_caches:
-            for j, existing_cache in enumerate(self.caches):
-                if fifocache.read_rate >= existing_cache.read_rate:
-                    self.caches.insert(j, fifocache)
-                    break
-            if j == len(self.caches) - 1:
-                self.caches.append(fifocache)
-        else:
-            self.caches = [fifocache]
-            self.has_caches = True
-        self.env.process(fifocache.cacheController())
-
-    def decideCaching(self, object_id):
-        for j, cache in enumerate(self.caches):
-            if cache.isFull():
-                victim_id = cache.contents[0]
-                yield self.env.process(cache.replaceObject(victim_id, object_id))
-                object_id = victim_id
-            else:
-                cache.cacheObject(object_id)
-                return
-
-
-class UNIFNode(Node):
-    def decideCaching(self, object_id):
-        cache = np.random.choice(self.caches)
-        if cache.isFull():
-            victim_id = np.random.choice(tuple(cache.contents))
-            yield self.env.process(cache.replaceObject(victim_id, object_id))
-        else:
-            cache.cacheObject(object_id)
-
-
 class PALFUNode(LFUNode):
     def lfuInit(self, num_objects, pen_weight):
         super().lfuInit(num_objects)
@@ -146,9 +83,30 @@ class PALFUNode(LFUNode):
             else:
                 self.caches[j].cacheObject(object_id)
 
+
+class WLFUNode(LFUNode):
+    def lfuInit(self, num_objects, win_size, period):
+        self.lfu_table = [0] * num_objects
+        self.lfu_counters = [0] * num_objects
+        self.lfu_windows = [wique(maxlen=win_size) for _ in range(num_objects)]
+        self.env.process(self.wlfuProcess(num_objects, period))
+
+    def receiveInterest(self, remote_id, request):
+        self.lfu_counters[request.object_id] += 1
+        Node.receiveInterest(self, remote_id, request)
+
+    def wlfuProcess(self, num_objects, period):
+        while True:
+            yield self.env.timeout(period)
+            for k in range(num_objects):
+                self.lfu_windows[k].append(self.lfu_counters[k])
+                self.lfu_counters[k] = 0
+                self.lfu_table[k] = self.lfu_windows[k].mean
+
+
 class PAWLFUNode(WLFUNode):
-    def lfuInit(self, num_objects, pen_weight):
-        super().lfuInit(num_objects)
+    def lfuInit(self, num_objects, win_size, period, pen_weight):
+        super().lfuInit(num_objects, win_size, period)
         self.pw = pen_weight
 
     def decideCaching(self, object_id):
@@ -179,3 +137,46 @@ class PAWLFUNode(WLFUNode):
                 self.env.process(self.decideCaching(victims[j]))
             else:
                 self.caches[j].cacheObject(object_id)
+
+
+class UNIFNode(Node):
+    def decideCaching(self, object_id):
+        cache = np.random.choice(self.caches)
+        if cache.isFull():
+            victim_id = np.random.choice(tuple(cache.contents))
+            yield self.env.process(cache.replaceObject(victim_id, object_id))
+        else:
+            cache.cacheObject(object_id)
+
+
+class FIFONode(Node):
+    def addCache(self, cache):
+        fifocache = FIFOCache(
+            self.env,
+            cache.capacity,
+            cache.read_rate,
+            cache.write_rate,
+            cache.read_penalty,
+            cache.write_penalty,
+        )
+        if self.has_caches:
+            for j, existing_cache in enumerate(self.caches):
+                if fifocache.read_rate >= existing_cache.read_rate:
+                    self.caches.insert(j, fifocache)
+                    break
+            if j == len(self.caches) - 1:
+                self.caches.append(fifocache)
+        else:
+            self.caches = [fifocache]
+            self.has_caches = True
+        self.env.process(fifocache.cacheController())
+
+    def decideCaching(self, object_id):
+        for j, cache in enumerate(self.caches):
+            if cache.isFull():
+                victim_id = cache.contents[0]
+                yield self.env.process(cache.replaceObject(victim_id, object_id))
+                object_id = victim_id
+            else:
+                cache.cacheObject(object_id)
+                return

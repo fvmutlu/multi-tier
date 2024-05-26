@@ -159,12 +159,16 @@ class VIPNode(Node):
 
         return vip_allocs
 
+    def updateVipCacheScores(self):
+        for k in self.cacheable_objects:
+            self.cache_scores[k] = self.vip_counts[k]
+
     def vipCaching(self):
         cache, virtual_cache = self.caches[0], self.virtual_caches[0]
         temp_cache_scores = [0] * self.num_objects
         for k in self.cacheable_objects:
             # Update cache scores for use outside virtual plane (this can be different for variants)
-            self.cache_scores[k] = self.vip_counts[k]
+            # self.cache_scores[k] = self.vip_counts[k]
             # Use local scope scores for virtual plane caching algorithm
             temp_cache_scores[k] = cache.read_rate * self.cache_scores[k]
             if k in virtual_cache:
@@ -182,6 +186,12 @@ class VIPNode(Node):
         stop_index = min(first_zero_index, cache.capacity)
         virtual_cache.clear()
         virtual_cache.update(sorted_cache_scores_idx[:stop_index])
+
+    def drainVipsByCaching(self):
+        for j, cache in enumerate(self.caches):
+            cache_decrement = max(self.slot_len * cache.read_rate / cache.capacity, 1)
+            for k in self.virtual_caches[j]:
+                self.vip_counts[k] = max(self.vip_counts[k] - cache_decrement, 0)
 
     def vipProcess(self):
         while True:
@@ -203,17 +213,13 @@ class VIPNode(Node):
             # Determine virtual plane forwarding
             vip_allocs = self.vipForwarding()
 
-            # Determine virtual plane caching
             if self.has_caches:
+                # Update cache scores for use outside virtual plane (this can be different for variants)
+                self.updateVipCacheScores()
+                # Determine virtual plane caching
                 self.vipCaching()
-
-            # Decrement VIP counts due to caching
-            if self.has_caches:
-                for j, cache in enumerate(self.caches):
-                    for k in self.virtual_caches[j]:
-                        self.vip_counts[k] = max(
-                            self.vip_counts[k] - self.slot_len * cache.read_rate, 0
-                        )
+                # Decrement VIP counts due to caching
+                self.drainVipsByCaching()
 
             # Determine actual amount of VIPs that will be forwarded
             fwd_vips = {}
@@ -267,69 +273,35 @@ class VIPNode(Node):
 
 
 class VIP2Node(VIPNode):
-    def vipCaching(self):
-        cache, virtual_cache = self.caches[0], self.virtual_caches[0]
-        temp_cache_scores = [0] * self.num_objects
+    def updateVipCacheScores(self):
         for k in self.cacheable_objects:
-            # Update cache scores for use outside virtual plane (this can be different for variants)
             self.cache_scores[k] = self.vip_rx_windows[k].mean
-            # Use local scope scores for virtual plane caching algorithm
-            temp_cache_scores[k] = cache.read_rate * self.cache_scores[k]
-            if k in virtual_cache:
-                temp_cache_scores[k] += self.pw * cache.read_penalty
-            else:
-                temp_cache_scores[k] -= self.pw * cache.write_penalty
-
-        # Sort from highest to lowest cache score
-        sorted_cache_scores = np.flip(np.sort(temp_cache_scores))
-        # Obtain object ids for sorted scores
-        sorted_cache_scores_idx = np.flip(np.argsort(temp_cache_scores))
-        # Find the index of the first zero score
-        first_zero_index = np.where(sorted_cache_scores == 0)[0][0]
-        # Cache up to either the first zero score object, or up to capacity
-        stop_index = min(first_zero_index, cache.capacity)
-        virtual_cache.clear()
-        virtual_cache.update(sorted_cache_scores_idx[:stop_index])
 
 
 class VIPSBWNode(VIPNode):
-    def vipCaching(self):
-        cache, virtual_cache = self.caches[0], self.virtual_caches[0]
-        temp_cache_scores = [0] * self.num_objects
-        for k in self.cacheable_objects:
-            # Update cache scores for use outside virtual plane (this can be different for variants)
-            self.cache_scores[k] = self.vip_counts[k]
-            # Use local scope scores for virtual plane caching algorithm
-            temp_cache_scores[k] = cache.read_rate * self.cache_scores[k]
-            if k in virtual_cache:
-                temp_cache_scores[k] += self.pw * cache.read_penalty
-            else:
-                temp_cache_scores[k] -= self.pw * cache.write_penalty
-
-        virtual_cache.clear()
-        max_score_object = np.argmax(temp_cache_scores)
-        if temp_cache_scores[max_score_object] > 0:
-            virtual_cache.add(max_score_object)
+    def drainVipsByCaching(self):
+        for j, cache in enumerate(self.caches):
+            cache_decrement = self.slot_len * cache.read_rate
+            if self.virtual_caches[j]:
+                k_star = max(self.virtual_caches[j], key=lambda k: self.cache_scores[k])
+                self.vip_counts[k_star] = max(
+                    self.vip_counts[k_star] - cache_decrement, 0
+                )
 
 
 class VIPSBW2Node(VIPNode):
-    def vipCaching(self):
-        cache, virtual_cache = self.caches[0], self.virtual_caches[0]
-        temp_cache_scores = [0] * self.num_objects
+    def updateVipCacheScores(self):
         for k in self.cacheable_objects:
-            # Update cache scores for use outside virtual plane (this can be different for variants)
             self.cache_scores[k] = self.vip_rx_windows[k].mean
-            # Use local scope scores for virtual plane caching algorithm
-            temp_cache_scores[k] = cache.read_rate * self.cache_scores[k]
-            if k in virtual_cache:
-                temp_cache_scores[k] += self.pw * cache.read_penalty
-            else:
-                temp_cache_scores[k] -= self.pw * cache.write_penalty
 
-        virtual_cache.clear()
-        max_score_object = np.argmax(temp_cache_scores)
-        if temp_cache_scores[max_score_object] > 0:
-            virtual_cache.add(max_score_object)
+    def drainVipsByCaching(self):
+        for j, cache in enumerate(self.caches):
+            cache_decrement = self.slot_len * cache.read_rate
+            if self.virtual_caches[j]:
+                k_star = max(self.virtual_caches[j], key=lambda k: self.cache_scores[k])
+                self.vip_counts[k_star] = max(
+                    self.vip_counts[k_star] - cache_decrement, 0
+                )
 
 
 class MVIPNode(VIPNode):
@@ -377,6 +349,10 @@ class MVIPNode(VIPNode):
             else:
                 self.caches[j].cacheObject(object_id)
 
+    def updateVipCacheScores(self):
+        for k in self.cacheable_objects:
+            self.cache_scores[k] = self.vip_rx_windows[k].mean
+
     def vipCaching(self):
         total_cache_size = sum(cache.capacity for cache in self.caches)
 
@@ -387,7 +363,7 @@ class MVIPNode(VIPNode):
             # Locate object
             object_loc = self.virtual_object_locs[k]
             # Update cache score
-            self.cache_scores[k] = self.vip_rx_windows[k].mean
+            # self.cache_scores[k] = self.vip_rx_windows[k].mean
             # The cs_k values act as temp scores for MVIP
             cs_k = self.cache_scores[k]
             for j, cache in enumerate(self.caches):

@@ -78,13 +78,15 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
         case "none", "lfu":
             return LFUNode(env, node_id, kwargs["num_objects"])
         case "none", "wlfu":
-            return WLFUNode(env, node_id, kwargs["num_objects"])
+            return WLFUNode(env, node_id, kwargs["num_objects"], kwargs["vip_args"]["vip_win_size"], kwargs["vip_args"]["vip_slot_len"])
         case "none", "fifo":
             return FIFONode(env, node_id)
         case "none", "unif":
             return UNIFNode(env, node_id)
         case "none", "palfu":
             return PALFUNode(env, node_id, kwargs["num_objects"], kwargs["pen_weight"])
+        case "none", "pawlfu":
+            return PAWLFUNode(env, node_id, kwargs["num_objects"], kwargs["vip_args"]["vip_win_size"], kwargs["vip_args"]["vip_slot_len"], kwargs["pen_weight"])
         case "rr", "none":
             return RoundRobinNode(env, node_id)
         case "rr", "lru":
@@ -108,7 +110,7 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
         case "lrt", "lfu":
             return LRTLFUNode(env, node_id, kwargs["num_objects"])
         case "lrt", "wlfu":
-            return LRTWLFUNode(env, node_id, kwargs["num_objects"])
+            return LRTWLFUNode(env, node_id, kwargs["num_objects"], kwargs["vip_args"]["vip_win_size"], kwargs["vip_args"]["vip_slot_len"])
         case "lrt", "fifo":
             return LRTFIFONode(env, node_id)
         case "lrt", "unif":
@@ -119,7 +121,7 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
             )
         case "lrt", "pawlfu":
             return LRTPAWLFUNode(
-                env, node_id, kwargs["num_objects"], kwargs["pen_weight"]
+                env, node_id, kwargs["num_objects"], kwargs["vip_args"]["vip_win_size"], kwargs["vip_args"]["vip_slot_len"], kwargs["pen_weight"]
             )
         case "vip", cache_pol if cache_pol in [
             "none",
@@ -246,17 +248,15 @@ def offlineRequestGenerator(
     for node_id in nodes:
         intervals = []
         objects = []
-        shuffle_interval = 5
+        shuffle_interval = 1
         while sum(intervals) < stop_time:
             intervals.append(rng.exponential(1 / rate))
             objects.append(rng.choice(arange(num_objects), p=prob_dist))
-            if (
-                shuffle_interval != 0
-                and sum(intervals) > (stop_time / shuffle_interval)
-                and "shuffle" in dist_type
+            if "shuffle" in dist_type and sum(intervals) > shuffle_interval * (
+                stop_time / 4
             ):
                 rng.shuffle(prob_dist)
-                shuffle_interval -= 1
+                shuffle_interval += 1
         reqs[node_id] = {"intervals": intervals, "objects": objects}
     return reqs
 
