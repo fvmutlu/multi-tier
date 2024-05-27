@@ -189,7 +189,7 @@ class VIPNode(Node):
 
     def drainVipsByCaching(self):
         for j, cache in enumerate(self.caches):
-            cache_decrement = max(self.slot_len * cache.read_rate / cache.capacity, 1)
+            cache_decrement = self.slot_len * cache.read_rate / cache.capacity
             for k in self.virtual_caches[j]:
                 self.vip_counts[k] = max(self.vip_counts[k] - cache_decrement, 0)
 
