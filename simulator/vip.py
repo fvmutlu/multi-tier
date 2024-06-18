@@ -1,6 +1,7 @@
 # External package imports
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+#import time
 
 # Builtin imports
 from collections import defaultdict
@@ -42,6 +43,7 @@ class VIPNode(Node):
         # Additional stats relating to VIP
         # self.stats["vip_count_sum"] = []
         # self.stats["pit_count_sum"] = []
+        # self.stats["vip_caching_avg_time"] = 0
 
         # Init VIP process
         self.env.process(self.vipProcess())
@@ -194,6 +196,7 @@ class VIPNode(Node):
                 self.vip_counts[k] = max(self.vip_counts[k] - cache_decrement, 0)
 
     def vipProcess(self):
+        #avg_cpu_time, cpu_counter = 0, 0
         while True:
             # Set VIP counts to 0 for all sourced objects
             if self.is_source:
@@ -213,6 +216,7 @@ class VIPNode(Node):
             # Determine virtual plane forwarding
             vip_allocs = self.vipForwarding()
 
+            #tic = time.perf_counter()
             if self.has_caches:
                 # Update cache scores for use outside virtual plane (this can be different for variants)
                 self.updateVipCacheScores()
@@ -220,6 +224,9 @@ class VIPNode(Node):
                 self.vipCaching()
                 # Decrement VIP counts due to caching
                 self.drainVipsByCaching()
+            #toc = time.perf_counter()
+            #avg_cpu_time, cpu_counter = (avg_cpu_time * cpu_counter + (toc - tic)) / (cpu_counter + 1), cpu_counter + 1
+            #self.stats["vip_caching_avg_time"] = avg_cpu_time
 
             # Determine actual amount of VIPs that will be forwarded
             fwd_vips = {}
