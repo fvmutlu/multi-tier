@@ -1,7 +1,7 @@
 # External package imports
 import numpy as np
 from scipy.optimize import linear_sum_assignment
-#import time
+import time
 
 # Builtin imports
 from collections import defaultdict
