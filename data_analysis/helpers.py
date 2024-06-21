@@ -13,6 +13,15 @@ from urllib.request import urlopen
 from simulator.helpers import SimulationParameters, simConfigToParamSets
 from simulator.topologies import topologies
 
+def dictsToParamSets(param_dicts: List[dict]) -> List[SimulationParameters]:
+    for param_set in param_dicts:
+        param_set["cache_capacities"] = tuple(param_set["cache_capacities"])
+        param_set["cache_read_rates"] = tuple(param_set["cache_read_rates"])
+        param_set["cache_write_rates"] = tuple(param_set["cache_write_rates"])
+        param_set["cache_read_pens"] = tuple(param_set["cache_read_pens"])
+        param_set["cache_write_pens"] = tuple(param_set["cache_write_pens"])
+    return [SimulationParameters(**param_set) for param_set in param_dicts]
+
 
 def getTestConfig(config_path: str):
     if isfile(config_path):
