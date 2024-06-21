@@ -21,6 +21,7 @@ from .network import getNetwork
 from .helpers import (
     assignSources,
     assignRouting,
+    assignBasicRouting,
     offlineRequestGenerator,
     simConfigToParamSets
 )
@@ -191,7 +192,8 @@ def simRun(
     caches = [i for i in namedZip(**cache_dict)]
     network.installCaches(cache_nodes, caches)
 
-    fibs = assignRouting(top_graph, nodes, source_map)
+    #fibs = assignRouting(top_graph, nodes, source_map)
+    fibs = assignBasicRouting(top_graph, nodes, source_map)
     network.installFIBs(fibs)
 
     requests = requests_dict[

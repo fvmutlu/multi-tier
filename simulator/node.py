@@ -12,8 +12,6 @@ from .link import Link
 
 Packet = namedtuple("Packet", ["type", "object_id"])
 
-
-# TODO: BasicNode now called Node
 class Node(object):
     """
     Template for a barebones node object.
@@ -160,6 +158,7 @@ class Node(object):
             self.env.process(self.respondWithLocal(request, object_location))
 
     def respondWithLocal(self, request, object_location):
+        print(f"Node {self.id} responding to request for src:{request.origin_id},obj:{request.object_id},seq:{request.seq_id}")
         object_id = request.object_id
         if object_location == -1:
             yield self.env.process(self.permastore.readObject(object_id))

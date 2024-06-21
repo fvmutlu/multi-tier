@@ -18,7 +18,18 @@ class RoundRobinNode(Node):
 
     def forwardInterest(self, request):
         object_id = request.object_id
+        print(f"Request for {object_id} will be forwarded from {self.id}")
         remote_id = self.link_queues[object_id][0]
+        i = 1
+        while remote_id in request.path:
+            print(f"Skipping {remote_id} as it was already visited in path")
+            self.link_queues[object_id].rotate(1)
+            remote_id = self.link_queues[object_id][0]
+            i += 1
+            if i > len(self.link_queues[object_id]):
+                print(f"Request path: {request.path}")
+                raise Exception("No more links to forward to")
+        print(f"Forwarding to {remote_id}")
         self.link_queues[object_id].rotate(1)
         self.sendInterestPacket(remote_id, request)
 
@@ -52,7 +63,7 @@ class LeastResponseTimeNode(Node):
     def forwardInterest(self, request):
         object_id = request.object_id
         valid_link_avg_delays = np.array(
-            [self.link_delays[link].mean for link in self.fib[object_id]]
+            [self.link_delays[remote_id].mean for remote_id in self.fib[object_id]]
         )
         rng = np.random.default_rng(1)
         idx = rng.choice(

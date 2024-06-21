@@ -8,17 +8,17 @@ class Request(object):
         self.origin_id = origin_id
         self.seq_id = seq_id
         self.object_id = object_id
+        self.path = []
         self.log = {
             "origin": int(origin_id),
             "seq": int(seq_id),
             "obj": int(object_id),
-            "timestamps": [],
-            "nodes": [],
+            "timestamps": []
         }
 
     def logEvent(self, node_id):
         self.log["timestamps"].append(self.env.now)
-        self.log["nodes"].append(node_id)
+        self.path.append(node_id)
 
     def getLastTimestamp(self):
         return self.log["timestamps"][-1]
