@@ -194,6 +194,7 @@ def simRun(
 
     #fibs = assignRouting(top_graph, nodes, source_map)
     fibs = assignBasicRouting(top_graph, nodes, source_map)
+    #print(fibs)
     network.installFIBs(fibs)
 
     requests = requests_dict[

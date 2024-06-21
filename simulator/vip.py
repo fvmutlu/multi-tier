@@ -101,7 +101,7 @@ class VIPNode(Node):
 
     def forwardInterest(self, request):
         object_id = request.object_id
-        neighbors = self.fib[object_id]
+        neighbors = [remote_id for remote_id in self.fib[object_id] if remote_id not in request.path]
         link_profits = np.array(
             [self.neighbor_vip_tx[remote_id, object_id].mean for remote_id in neighbors]
         )

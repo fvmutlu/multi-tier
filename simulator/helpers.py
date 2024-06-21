@@ -268,6 +268,8 @@ def assignBasicRouting(G, node_ids, source_map):
         for source_node_id, objects in enumerate(source_map):
             if objects and (node_id != source_node_id):
                 paths = [p for p in nx.all_simple_paths(G, node_id, source_node_id)]
+                sp_len = min([len(p) for p in paths])
+                paths = [p for p in paths if len(p) <= sp_len + 1]
                 next_hops = [p[1] for p in paths]
                 unique_next_hops = list(set(next_hops))
                 for object_id in objects:
