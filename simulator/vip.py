@@ -23,7 +23,7 @@ class VIPNode(Node):
         # VIP Parameters
         self.vip_inc = vip_args["vip_inc"]
         self.slot_len = vip_args["vip_slot_len"]
-        self.win_size = vip_args["vip_win_size"]
+        self.win_size = int(vip_args["vip_win_size"] / vip_args["vip_slot_len"])
 
         # VIP State Variables
         self.vip_counts = [0] * num_objects
