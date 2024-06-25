@@ -5,7 +5,7 @@ import numpy as np
 from collections import deque
 
 # Internal imports
-from .node import Node
+from .node import IANode as Node
 from .utils import wique
 
 

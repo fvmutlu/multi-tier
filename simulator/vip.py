@@ -7,8 +7,7 @@ import time
 from collections import defaultdict
 
 # Internal imports
-from .caching_policies import *
-from .forwarding_policies import *
+from .node import IANode as Node
 from .utils import wique, invertDict, resetDict
 from .logutils import rootlogger
 
@@ -24,6 +23,8 @@ class VIPNode(Node):
         self.vip_inc = vip_args["vip_inc"]
         self.slot_len = vip_args["vip_slot_len"]
         self.win_size = int(vip_args["vip_win_size"] / vip_args["vip_slot_len"])
+        self.vip_ia_factor = [1] * num_objects
+        self.vip_ia_coeff = 0.125
 
         # VIP State Variables
         self.vip_counts = [0] * num_objects
@@ -95,7 +96,9 @@ class VIPNode(Node):
 
     def receiveInterest(self, remote_id, request):
         if remote_id == self.id:
-            self.vip_counts[request.object_id] += self.vip_inc
+            self.vip_counts[request.object_id] += (
+                self.vip_inc / self.vip_ia_factor[request.object_id]
+            )
             self.vip_rx[request.object_id] += self.vip_inc
         super().receiveInterest(remote_id, request)
 
@@ -196,7 +199,7 @@ class VIPNode(Node):
                 self.vip_counts[k] = max(self.vip_counts[k] - cache_decrement, 0)
 
     def vipProcess(self):
-        #avg_cpu_time, cpu_counter = 0, 0
+        # avg_cpu_time, cpu_counter = 0, 0
         while True:
             # Set VIP counts to 0 for all sourced objects
             if self.is_source:
@@ -216,7 +219,7 @@ class VIPNode(Node):
             # Determine virtual plane forwarding
             vip_allocs = self.vipForwarding()
 
-            #tic = time.perf_counter()
+            # tic = time.perf_counter()
             if self.has_caches:
                 # Update cache scores for use outside virtual plane (this can be different for variants)
                 self.updateVipCacheScores()
@@ -224,9 +227,9 @@ class VIPNode(Node):
                 self.vipCaching()
                 # Decrement VIP counts due to caching
                 self.drainVipsByCaching()
-            #toc = time.perf_counter()
-            #avg_cpu_time, cpu_counter = (avg_cpu_time * cpu_counter + (toc - tic)) / (cpu_counter + 1), cpu_counter + 1
-            #self.stats["vip_caching_avg_time"] = avg_cpu_time
+            # toc = time.perf_counter()
+            # avg_cpu_time, cpu_counter = (avg_cpu_time * cpu_counter + (toc - tic)) / (cpu_counter + 1), cpu_counter + 1
+            # self.stats["vip_caching_avg_time"] = avg_cpu_time
 
             # Determine actual amount of VIPs that will be forwarded
             fwd_vips = {}
@@ -268,10 +271,16 @@ class VIPNode(Node):
             for remote_id in self.ctrl_in_links:
                 rx_vips = yield self.ctrl_in_links[remote_id].getVips()
                 for object_id in rx_vips:
-                    self.vip_counts[object_id] += rx_vips[object_id]
+                    self.vip_counts[object_id] += (
+                        rx_vips[object_id] / self.vip_ia_factor[object_id]
+                    )
                     self.vip_rx[object_id] += rx_vips[object_id]
             for k in range(self.num_objects):
-                self.vip_rx_windows[k].append(self.vip_rx[k])
+                self.vip_rx_windows[k].append(self.vip_rx[k] / self.vip_ia_factor[k])
+                # Update IA factor
+                self.vip_ia_factor[k] *= (1 - self.vip_ia_coeff)
+                self.vip_ia_factor[k] += self.vip_ia_coeff * self.vip_rx[k]
+                # Reset time slot rx vip count
                 self.vip_rx[k] = 0
 
             # Update VIP stats

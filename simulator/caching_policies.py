@@ -4,7 +4,7 @@ import numpy as np
 # Builtin imports
 
 # Internal imports
-from .node import Node
+from .node import IANode as Node
 from .utils import wique
 from .cache import FIFOCache
 
