@@ -6,6 +6,39 @@ import json
 from collections import deque, defaultdict
 from itertools import product
 from datetime import timedelta
+from dataclasses import dataclass
+
+@dataclass
+class AverageAccumulator:
+    """
+    A class for maintaining a moving window with a quick update for mean calculation.
+
+    Attributes:
+        maxlen (int): The maximum length of the window.
+        curlen (int): The current length of the window.
+        q (collections.deque): Deque representing the window.
+        mean (float): The mean value of the elements in the window.
+        sum (float): The sum of the elements in the window.
+
+    Methods:
+        __init__(self, maxlen=10): Initializes the wique object with a specified maximum length.
+        accumulate(self, x): Adds a new element to the window, updating mean and sum accordingly.
+    """
+    curlen: int = 0
+    cursum: float = 0
+
+    def accumulate(self, x: float) -> None:
+        """
+        Adds a new element to the window, updating mean and sum accordingly.
+
+        Args:
+            x: The new element to add to the window.
+        """
+        self.cursum += x
+        self.curlen += 1
+    
+    def mean(self) -> float:
+        return self.cursum / self.curlen
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):

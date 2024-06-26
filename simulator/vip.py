@@ -44,6 +44,8 @@ class VIPNode(Node):
         # self.stats["vip_count_sum"] = []
         # self.stats["pit_count_sum"] = []
         # self.stats["vip_caching_avg_time"] = 0
+        self.stats["vip_rx_avg_in_cache"] = []
+        self.stats["vip_tx_ties"] = 0
 
         # Init VIP process
         self.env.process(self.vipProcess())
@@ -77,6 +79,7 @@ class VIPNode(Node):
             )
         super().addCache(cache)
         self.virtual_caches.append(set())
+        self.stats["vip_rx_avg_in_cache"].append([])
 
     def addPermastore(self, permastore):
         super().addPermastore(permastore)
@@ -111,6 +114,8 @@ class VIPNode(Node):
             [self.link_delays[remote_id].mean for remote_id in neighbors]
         )
         max_profit_link_idx = np.where(link_profits == link_profits.max())[0]
+        if len(max_profit_link_idx) > 1:
+            self.stats["vip_tx_ties"] += 1
         max_profit_link_delays = np.array(
             [link_delays[idx] for idx in max_profit_link_idx]
         )
@@ -278,6 +283,11 @@ class VIPNode(Node):
             # Update VIP stats
             # self.stats["vip_count_sum"].append(sum(self.vip_counts))
             # self.stats["pit_count_sum"].append(sum([len(q) for q in self.pit.values()]))
+            """ if self.has_caches:
+                for j, cache in enumerate(self.caches):
+                    self.stats["vip_rx_avg_in_cache"][j].append(
+                        sum([self.vip_rx_windows[k].mean for k in cache.contents])
+                    ) """
 
 
 class VIP2Node(VIPNode):
@@ -285,31 +295,74 @@ class VIP2Node(VIPNode):
         for k in self.cacheable_objects:
             self.cache_scores[k] = self.vip_rx_windows[k].mean
 
-
-class VIPSBWNode(VIPNode):
-    def drainVipsByCaching(self):
-        for j, cache in enumerate(self.caches):
-            cache_decrement = self.slot_len * cache.read_rate
-            if self.virtual_caches[j]:
-                k_star = max(self.virtual_caches[j], key=lambda k: self.cache_scores[k])
-                self.vip_counts[k_star] = max(
-                    self.vip_counts[k_star] - cache_decrement, 0
-                )
-
-
-class VIPSBW2Node(VIPNode):
-    def updateVipCacheScores(self):
+    def vipCaching(self):
+        cache, virtual_cache = self.caches[0], self.virtual_caches[0]
+        temp_cache_scores = [0] * self.num_objects
         for k in self.cacheable_objects:
-            self.cache_scores[k] = self.vip_rx_windows[k].mean
+            temp_cache_scores[k] = cache.read_rate * self.cache_scores[k]
+            if k in virtual_cache:
+                temp_cache_scores[k] += self.pw * cache.read_penalty
+            else:
+                temp_cache_scores[k] -= self.pw * cache.write_penalty
 
+        # Sort from highest to lowest cache score
+        sorted_cache_scores = np.flip(np.sort(temp_cache_scores))
+        # Obtain object ids for sorted scores
+        sorted_cache_scores_idx = np.flip(np.argsort(temp_cache_scores))
+        # Find the index of the first zero score
+        first_zero_index = np.where(sorted_cache_scores == 0)[0][0]
+        # Cache up to either the first zero score object, or up to capacity
+        stop_index = min(first_zero_index, cache.capacity)
+        virtual_cache.clear()
+        virtual_cache.update(sorted_cache_scores_idx[:stop_index])
+
+
+class VIPSBWNode(VIP2Node):
     def drainVipsByCaching(self):
         for j, cache in enumerate(self.caches):
-            cache_decrement = self.slot_len * cache.read_rate
             if self.virtual_caches[j]:
+                cache_decrement = self.slot_len * cache.read_rate
                 k_star = max(self.virtual_caches[j], key=lambda k: self.cache_scores[k])
                 self.vip_counts[k_star] = max(
                     self.vip_counts[k_star] - cache_decrement, 0
                 )
+
+
+class VIPSBW2Node(VIP2Node):
+    def vipForwarding(self):
+        vip_allocs = defaultdict(list)
+
+        for b in self.fib_inv:
+            vip_diff = [
+                self.vip_counts[k] - self.neighbor_vip_counts[b][k]
+                for k in self.fib_inv[b]
+            ]
+            k_star_index_sorted = np.flip(np.argsort(vip_diff))
+            i = 0
+            while vip_diff[k_star_index_sorted[i]] > 0 and i < len(k_star_index_sorted):
+                k_star_index = k_star_index_sorted[i]
+                k_star = self.fib_inv[b][k_star_index]
+                vip_allocs[k_star].append((vip_diff[k_star_index], b))
+                i += 1
+
+        return vip_allocs
+    
+    def drainVipsByCaching(self):
+        for j, cache in enumerate(self.caches):
+            if self.virtual_caches[j]:
+                cache_decrement = self.slot_len * cache.read_rate
+                sorted_k = sorted(
+                    self.virtual_caches[j], key=lambda k: self.cache_scores[k], reverse=True
+                )
+                i = 0
+                while cache_decrement > 0 and i < len(sorted_k):
+                    k_star = sorted_k[i]
+                    vip_dec = min(self.vip_counts[k_star], cache_decrement)
+                    self.vip_counts[k_star] = max(
+                        self.vip_counts[k_star] - vip_dec, 0
+                    )
+                    cache_decrement -= vip_dec
+                    i += 1
 
 
 class MVIPNode(VIPNode):
@@ -321,6 +374,7 @@ class MVIPNode(VIPNode):
     def addCache(self, cache):
         Node.addCache(self, cache)
         self.virtual_caches.append(set())
+        self.stats["vip_rx_avg_in_cache"].append([])
         self.tier_mapping += [len(self.caches) - 1] * cache.capacity
         if self.tier_slices:
             end_of_last_slice = self.tier_slices[-1].stop
