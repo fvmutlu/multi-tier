@@ -163,7 +163,7 @@ class VIPNode(Node):
 
     def updateVipCacheScores(self):
         for k in self.cacheable_objects:
-            self.cache_scores[k] = self.vip_counts[k]
+            self.cache_scores[k] = self.vip_rx_windows[k].mean
 
     def vipCaching(self):
         cache, virtual_cache = self.caches[0], self.virtual_caches[0]
@@ -172,7 +172,8 @@ class VIPNode(Node):
             # Update cache scores for use outside virtual plane (this can be different for variants)
             # self.cache_scores[k] = self.vip_counts[k]
             # Use local scope scores for virtual plane caching algorithm
-            temp_cache_scores[k] = cache.read_rate * self.cache_scores[k]
+            temp_cache_scores[k] = self.vip_counts[k]
+            temp_cache_scores[k] = cache.read_rate * temp_cache_scores[k]
             if k in virtual_cache:
                 temp_cache_scores[k] += self.pw * cache.read_penalty
             else:
@@ -372,7 +373,8 @@ class MVIPNode(VIPNode):
             # Update cache score
             # self.cache_scores[k] = self.vip_rx_windows[k].mean
             # The cs_k values act as temp scores for MVIP
-            cs_k = self.cache_scores[k]
+            # cs_k = self.cache_scores[k]
+            cs_k = self.vip_counts[k]
             for j, cache in enumerate(self.caches):
                 tier_slice = self.tier_slices[j]
                 if object_loc == j:
