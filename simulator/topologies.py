@@ -152,7 +152,19 @@ topologies = {
             "m": 3,
             "seed": 1
         }
-    }
+    },
+    "balanced": {
+        "fixed": False,
+        "link_caps": 10,
+        "source_nodes": [],
+        "cache_nodes": [],
+        "requester_nodes": [],
+        "top_args": {
+            "r": 3,
+            "h": 3
+        }
+    },
+
 }
 
 def getRandomTopology(top_name, **args):
@@ -166,3 +178,5 @@ def getRandomTopology(top_name, **args):
         return nx.watts_strogatz_graph(args['num_nodes'], args['k'], args['p'], args['seed'])
     if top_name == 'barabasi':
         return nx.barabasi_albert_graph(args['num_nodes'], args['m'], args['seed'])
+    if top_name == 'balanced':
+        return nx.balanced_tree(args['r'], args['h'])
