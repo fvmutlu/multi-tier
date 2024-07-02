@@ -7,6 +7,18 @@ import networkx as nx
 # Internal imports
 
 topologies = {
+    "ndise": {
+        "fixed": True,
+        "num_nodes": 4,
+        "adjacency_matrix": np.array([[0, 1, 1, 0],
+                                      [1, 0, 0, 1],
+                                      [1, 0, 0, 1],
+                                      [0, 1, 1, 0]]),
+        "link_caps": 10,
+        "source_nodes": [3],
+        "cache_nodes": [1,2],
+        "requester_nodes": [0,2]
+    },
     "service": {
         "fixed": True,
         "num_nodes": 8,
@@ -174,7 +186,7 @@ def getRandomTopology(top_name, **args):
     if top_name == 'erdos':
         return nx.erdos_renyi_graph(args['num_nodes'], args['p'], args['seed'])
     if top_name == 'watts':
-        return nx.watts_strogatz_graph(args['num_nodes'], args['k'], args['p'], args['seed'])
+        return nx.connected_watts_strogatz_graph(args['num_nodes'], args['k'], args['p'], args['seed'])
     if top_name == 'barabasi':
         return nx.barabasi_albert_graph(args['num_nodes'], args['m'], args['seed'])
     if top_name == 'balanced':

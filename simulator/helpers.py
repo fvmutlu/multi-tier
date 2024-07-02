@@ -265,7 +265,7 @@ def assignRouting(G, node_ids, source_map):
     fibs = {}
     for node_id in node_ids:
         fibs[node_id] = defaultdict(list)
-        for source_node_id, objects in enumerate(source_map):
+        for source_node_id, objects in source_map.items():
             if objects and (node_id != source_node_id):
                 paths = [p for p in nx.all_shortest_paths(G, node_id, source_node_id)]
                 next_hops = [p[1] for p in paths]
@@ -278,13 +278,10 @@ def assignRouting(G, node_ids, source_map):
 def assignSources(seed, nodes, num_objects):
     rng = default_rng(seed)
     source_map_inv = rng.choice(nodes, size=num_objects, replace=True)
-    source_map = [
-        [
-            object_id
-            for object_id in range(num_objects)
-            if source_map_inv[object_id] == node_id
+    source_map = {}
+    for node_id in nodes:
+        source_map[node_id] = [
+            object_id for object_id in range(num_objects) if source_map_inv[object_id] == node_id
         ]
-        for node_id in nodes
-    ]
 
     return source_map
