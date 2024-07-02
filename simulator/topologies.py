@@ -7,7 +7,7 @@ import networkx as nx
 # Internal imports
 
 topologies = {
-    "ndise": {
+    "ndise-mp": {
         "fixed": True,
         "num_nodes": 4,
         "adjacency_matrix": np.array([[0, 1, 1, 0],
@@ -19,28 +19,20 @@ topologies = {
         "cache_nodes": [1,2],
         "requester_nodes": [0,2]
     },
-    "service": {
+    "ndise-sv": {
         "fixed": True,
-        "num_nodes": 8,
-        "adjacency_matrix": np.array([[0, 1, 0, 0, 0, 0, 0, 0], 
-                                    [1, 0, 1, 0, 0, 0, 0, 0], 
-                                    [0, 1, 0, 1, 0, 0, 0, 0], 
-                                    [0, 0, 1, 0, 1, 1, 1, 1], 
-                                    [0, 0, 0, 1, 0, 0, 0, 0], 
-                                    [0, 0, 0, 1, 0, 0, 0, 0], 
-                                    [0, 0, 0, 1, 0, 0, 0, 0], 
-                                    [0, 0, 0, 1, 0, 0, 0, 0]]),
-        "link_caps": np.array([ [0, 40, 0, 0, 0, 0, 0, 0], 
-                                [40, 0, 40, 0, 0, 0, 0, 0], 
-                                [0, 40, 0, 40, 0, 0, 0, 0], 
-                                [0, 0, 40, 0, 10, 10, 10, 10], 
-                                [0, 0, 0, 10, 0, 0, 0, 0], 
-                                [0, 0, 0, 10, 0, 0, 0, 0], 
-                                [0, 0, 0, 10, 0, 0, 0, 0], 
-                                [0, 0, 0, 10, 0, 0, 0, 0]]),
+        "num_nodes": 5,
+        "adjacency_matrix": np.array([
+            [0, 1, 0, 0, 0],
+            [1, 0, 1, 0, 0],
+            [0, 1, 0, 1, 1],
+            [0, 0, 1, 0, 0],
+            [0, 0, 1, 0, 0]
+        ]),
+        "link_caps": 10,
         "source_nodes": [0],
-        "cache_nodes": [1,2,3],
-        "requester_nodes": [4,5,6,7]
+        "cache_nodes": [1, 2], 
+        "requester_nodes": [3, 4] 
     },
     "abilene": {
         "fixed": True,
@@ -110,9 +102,9 @@ topologies = {
         "cache_nodes": [],
         "requester_nodes": [],
         "top_args": {
-            "num_nodes": 16,
-            "rows": 4,
-            "cols": 4
+            "num_nodes": 25,
+            "rows": 5,
+            "cols": 5
         }
     },
     "regular": {
