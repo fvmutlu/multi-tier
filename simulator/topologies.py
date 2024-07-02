@@ -164,7 +164,6 @@ topologies = {
             "h": 3
         }
     },
-
 }
 
 def getRandomTopology(top_name, **args):
