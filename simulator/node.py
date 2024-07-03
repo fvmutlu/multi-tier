@@ -115,6 +115,8 @@ class Node(object):
         else:
             self.caches = [cache]
             self.has_caches = True
+        if self.id == 99:
+            cache.shouldLog()
         self.env.process(cache.cacheController())
 
     def addFIB(self, fib):
@@ -160,11 +162,14 @@ class Node(object):
             self.env.process(self.respondWithLocal(request, object_location))
 
     def respondWithLocal(self, request, object_location):
-        object_id = request.object_id
         if object_location == -1:
-            yield self.env.process(self.permastore.readObject(object_id))
+            yield self.env.process(self.permastore.readObject(request.object_id))
         else:
-            yield self.env.process(self.caches[object_location].readObject(object_id))
+            if self.id == 99:
+                print(f"TIME: {self.env.now:.5f} Read task scheduled at node {self.id} for object:{request.object_id}, origin:{request.origin_id}, seq:{request.seq_id}.")
+            yield self.env.process(self.caches[object_location].readObject(request.object_id, request.origin_id, request.seq_id))
+            if self.id == 99:
+                print(f"TIME: {self.env.now:.5f} Read task completed at node {self.id} for object:{request.object_id}, origin:{request.origin_id}, seq:{request.seq_id}.")
 
         self.receiveData(request)
 

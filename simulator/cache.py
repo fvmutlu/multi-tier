@@ -1,8 +1,10 @@
 # External package imports
 import simpy as sp
+from numpy.random import randint
 
 # Builtin imports
-from collections import namedtuple, deque
+from collections import deque
+from dataclasses import dataclass
 
 
 class Permastore(object):
@@ -45,8 +47,20 @@ class Permastore(object):
     def getStats(self):
         return self.stats
 
+@dataclass
+class CacheTask:
+    type: str
+    object_id: int
+    origin_id: int = None
+    seq_id: int = None
+    eviction_token: int = None
 
-CacheTask = namedtuple("CacheTask", ["type", "object_id"])
+@dataclass
+class CacheReadOutput:
+    object_id: int
+    origin_id: int = None
+    seq_id: int = None
+    eviction_token: int = None
 
 
 class Cache(object):
@@ -68,7 +82,9 @@ class Cache(object):
         self.contents = set()
         self.cur_size = 0
         self.task_queue = sp.Store(env)
-        self.out_buffer = sp.Store(env)
+        self.out_buffer = sp.FilterStore(env)
+
+        self.log = False
 
         # Statistics
         self.stats = {
@@ -84,35 +100,49 @@ class Cache(object):
     def isCached(self, object_id):
         return object_id in self.contents
 
+    def shouldLog(self):
+        self.log = True
+
     # This looping process observes the task queue
     # and schedules one-off processes accordingly
     def cacheController(self):
         while True:
             task = yield self.task_queue.get()
+            if self.log:
+                print(f"TIME: {self.env.now:.5f} INFO: Task received: {task}")
             if task.type == "r":
-                obj = yield self.env.process(self.readProcess(task.object_id))
-                self.out_buffer.put(obj)
+                yield self.env.process(self.readProcess())
+                self.out_buffer.put(CacheReadOutput(object_id=task.object_id, origin_id=task.origin_id, seq_id=task.seq_id))
+            elif task.type == "e":
+                yield self.env.process(self.readProcess())
+                self.out_buffer.put(CacheReadOutput(object_id=task.object_id, eviction_token=task.eviction_token))
             elif task.type == "w":
-                yield self.env.process(self.writeProcess(task.object_id))
+                yield self.env.process(self.writeProcess())
+            if self.log:
+                print(f"TIME: {self.env.now:.5f} INFO: Task delivered: {task}")
+                print(f"TIME: {self.env.now:.5f} output_buffer: {self.out_buffer.items}")
 
     # Since we don't have actual data content for these simulations
     # read process trivially returns the object id passed
-    def readProcess(self, object_id):
+    def readProcess(self):
         yield self.env.timeout(1 / self.read_rate)
-        return object_id
 
-    def writeProcess(self, object_id):
+    def writeProcess(self):
         yield self.env.timeout(1 / self.write_rate)
 
     # This one-off process schedules a read task, then yields
     # until it can retrieve an object from the output buffer
-    def readObject(self, object_id):
+    def readObject(self, object_id, origin_id, seq_id):
         if self.isCached(object_id):
             self.stats["reads"] += 1
-            task = CacheTask(type="r", object_id=object_id)
+            task = CacheTask(type="r", object_id=object_id, origin_id=origin_id, seq_id=seq_id)
             tic = self.env.now
             self.task_queue.put(task)
-            obj = yield self.out_buffer.get()
+            if self.log:
+                print(f"TIME: {self.env.now:.5f} INFO: Reading object:{object_id}, origin:{origin_id}, seq:{seq_id} from cache.")
+            obj = yield self.out_buffer.get(lambda output: output.object_id == object_id and output.origin_id == origin_id and output.seq_id == seq_id)
+            if self.log:
+                print(f"TIME: {self.env.now:.5f} INFO: Read object:{object_id}, origin:{origin_id}, seq:{seq_id} from cache.")
             toc = self.env.now
             self.stats["read_delay"] += toc - tic
             return obj
@@ -143,12 +173,12 @@ class Cache(object):
         if self.isCached(evicted_object_id):
             self.stats["replacements"] += 1
             self.contents.remove(evicted_object_id)
-            task = CacheTask(type="r", object_id=evicted_object_id)
-            self.task_queue.put(task)
+            evict_task = CacheTask(type="e", object_id=evicted_object_id, eviction_token=randint(2**32-1))
+            self.task_queue.put(evict_task)
             self.contents.add(cached_object_id)
-            task = CacheTask(type="w", object_id=cached_object_id)
-            self.task_queue.put(task)
-            obj = yield self.out_buffer.get()
+            write_task = CacheTask(type="w", object_id=cached_object_id)
+            self.task_queue.put(write_task)
+            obj = yield self.out_buffer.get(lambda output: output.object_id == evicted_object_id and output.eviction_token == evict_task.eviction_token)
             return obj
         else:
             print(
