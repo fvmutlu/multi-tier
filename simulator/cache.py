@@ -111,24 +111,16 @@ class Cache(object):
             if self.log:
                 print(f"TIME: {self.env.now:.5f} INFO: Task received: {task}")
             if task.type == "r":
-                yield self.env.process(self.readProcess())
+                yield self.env.timeout(1 / self.read_rate)
                 self.out_buffer.put(CacheReadOutput(object_id=task.object_id, origin_id=task.origin_id, seq_id=task.seq_id))
             elif task.type == "e":
-                yield self.env.process(self.readProcess())
+                yield self.env.timeout(1 / self.read_rate)
                 self.out_buffer.put(CacheReadOutput(object_id=task.object_id, eviction_token=task.eviction_token))
             elif task.type == "w":
-                yield self.env.process(self.writeProcess())
+                yield self.env.timeout(1 / self.write_rate)
             if self.log:
                 print(f"TIME: {self.env.now:.5f} INFO: Task delivered: {task}")
                 print(f"TIME: {self.env.now:.5f} output_buffer: {self.out_buffer.items}")
-
-    # Since we don't have actual data content for these simulations
-    # read process trivially returns the object id passed
-    def readProcess(self):
-        yield self.env.timeout(1 / self.read_rate)
-
-    def writeProcess(self):
-        yield self.env.timeout(1 / self.write_rate)
 
     # This one-off process schedules a read task, then yields
     # until it can retrieve an object from the output buffer
