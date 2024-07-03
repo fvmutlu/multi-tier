@@ -231,12 +231,12 @@ class FIFOCache(Cache):
                 )
             self.stats["replacements"] += 1
             self.contents.popleft()
-            task = CacheTask(type="r", object_id=evicted_object_id)
-            self.task_queue.put(task)
+            evict_task = CacheTask(type="e", object_id=evicted_object_id, eviction_token=randint(2**32-1))
+            self.task_queue.put(evict_task)
             self.contents.append(cached_object_id)
-            task = CacheTask(type="w", object_id=cached_object_id)
-            self.task_queue.put(task)
-            obj = yield self.out_buffer.get()
+            write_task = CacheTask(type="w", object_id=cached_object_id)
+            self.task_queue.put(write_task)
+            obj = yield self.out_buffer.get(lambda output: output.object_id == evicted_object_id and output.eviction_token == evict_task.eviction_token)
             return obj
         else:
             print(
