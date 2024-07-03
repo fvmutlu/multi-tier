@@ -1,8 +1,9 @@
 # External package imports
 import numpy as np
 import simpy as sp
-import joblib as jb
 import networkx as nx
+import joblib as jb
+from tqdm import tqdm
 
 # Builtin imports
 import argparse
@@ -210,7 +211,6 @@ def simRun(
     env.run(until=termination_watcher)
 
     elapsed_time = process_time() - start_time
-
     return network.getStats(), elapsed_time
 
 
@@ -222,8 +222,13 @@ if args.profiling:
     for params in param_set:
         results.append(simRun(**params))
 else:
-    results = jb.Parallel(n_jobs=args.num_cpus)(
-        jb.delayed(simRun)(**params) for params in param_set
+    results = list(
+        tqdm(
+            jb.Parallel(return_as="generator", n_jobs=args.num_cpus)(
+                jb.delayed(simRun)(**params) for params in param_set
+            ),
+            total=len(param_set),
+        )
     )
 
 test_end_time = datetime.now()
