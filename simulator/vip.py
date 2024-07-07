@@ -183,7 +183,7 @@ class VIPNode(Node):
         # Obtain object ids for sorted scores
         sorted_cache_scores_idx = np.flip(np.argsort(temp_cache_scores))
         # Find the index of the first zero score
-        first_zero_index = np.where(sorted_cache_scores == 0)[0][0]
+        first_zero_index = np.where(sorted_cache_scores <= 0)[0][0]
         # Cache up to either the first zero score object, or up to capacity
         stop_index = min(first_zero_index, cache.capacity)
         virtual_cache.clear()
