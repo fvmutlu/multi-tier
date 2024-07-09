@@ -1,6 +1,7 @@
 numpy
 matplotlib
 joblib
+tqdm
 simpy
 scipy
 networkx
