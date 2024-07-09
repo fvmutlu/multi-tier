@@ -2,6 +2,7 @@
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 import time
+import simpy as sp
 
 # Builtin imports
 from collections import defaultdict
@@ -404,3 +405,48 @@ class MVIPNode(VIPNode):
             if cost_matrix[i][k] >= 0 and k in self.cacheable_objects:
                 self.virtual_caches[self.tier_mapping[i]].add(k)
                 self.virtual_object_locs[k] = self.tier_mapping[i]
+
+
+class MVIPUNode(MVIPNode):
+    def addCache(self, cache):
+        super().addCache(cache)
+        if len(self.caches) > 1:
+            self.env.process(self.upwardMigrationProcess(10, 1))
+            self.stats["upward_migrations"] = 0
+
+    def upwardMigrationProcess(self, period, num_tries):
+        cost = self.pw * (
+            self.caches[0].write_penalty
+            + self.caches[0].read_penalty
+            + self.caches[1].write_penalty
+            + self.caches[1].read_penalty
+        )
+        read_rate_diff = self.caches[0].read_rate - self.caches[1].read_rate
+        while True:
+            yield self.env.timeout(period)
+            profit = 0
+            t = 0
+            while t < num_tries:
+                demote_candidate_id = min(
+                    self.caches[0].contents, key=lambda k: self.cache_scores[k]
+                )
+                promote_candidate_id = max(
+                    self.caches[1].contents, key=lambda k: self.cache_scores[k]
+                )
+                profit = (
+                    self.cache_scores[promote_candidate_id] * read_rate_diff
+                    - self.cache_scores[demote_candidate_id] * read_rate_diff
+                )
+                if profit > cost:
+                    #print(f"TIME: {self.env.now}, NODE: {self.id} | UPWARD MIGRATION -- UP: {promote_candidate_id}, DOWN: {demote_candidate_id}")
+                    self.stats["upward_migrations"] += 1
+                    evict_task_0 = self.env.process(self.caches[0].evictObject(demote_candidate_id))
+                    evict_task_1 = self.env.process(self.caches[1].evictObject(promote_candidate_id))
+                    yield sp.AllOf(self.env, [evict_task_0, evict_task_1])
+                    self.caches[0].cur_size -= 1
+                    self.caches[1].cur_size -= 1
+                    self.caches[0].cacheObject(promote_candidate_id)
+                    self.caches[1].cacheObject(demote_candidate_id)
+                    t += 1
+                else:
+                    break

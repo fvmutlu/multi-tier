@@ -138,6 +138,23 @@ class Cache(object):
             task = CacheTask(type="w", object_id=object_id)
             self.task_queue.put(task)
             return True
+    
+    def evictObject(self, evicted_object_id):
+        if self.isCached(evicted_object_id):
+            self.stats["reads"] += 1
+            self.contents.remove(evicted_object_id)
+            task = CacheTask(type="r", object_id=evicted_object_id)
+            tic = self.env.now
+            self.task_queue.put(task)
+            obj = yield self.out_buffer.get()
+            toc = self.env.now
+            self.stats["read_delay"] += toc - tic
+            return obj
+        else:
+            print(
+                f"TIME: {self.env.now} ERROR: Algorithm error while trying to read object {evicted_object_id}: object not in cache."
+            )
+            raise IndexError("Object not in cache.")
 
     def replaceObject(self, evicted_object_id, cached_object_id):
         if self.isCached(evicted_object_id):
