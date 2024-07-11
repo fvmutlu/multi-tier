@@ -325,3 +325,54 @@ class IANode(Node):
 
         if self.has_caches and self.locateObject(object_id) == -2:
             self.env.process(self.decideCaching(object_id))
+
+
+class UMNode(Node):
+    def addCache(self, cache):
+        super().addCache(cache)
+        if len(self.caches) > 1:
+            self.env.process(self.upwardMigrationProcess(10, 1))
+            self.stats["upward_migrations"] = 0
+
+    def cacheScore(self, object_id):
+        return 0
+
+    def upwardMigrationProcess(self, period, num_tries):
+        cost = self.pw * (
+            self.caches[0].write_penalty
+            + self.caches[0].read_penalty
+            + self.caches[1].write_penalty
+            + self.caches[1].read_penalty
+        )
+        read_rate_diff = self.caches[0].read_rate - self.caches[1].read_rate
+        while True:
+            yield self.env.timeout(period)
+            profit = 0
+            t = 0
+            while t < num_tries:
+                demote_candidate_id = min(
+                    self.caches[0].contents, key=lambda k: self.cacheScore(k)
+                )
+                promote_candidate_id = max(
+                    self.caches[1].contents, key=lambda k: self.cacheScore(k)
+                )
+                profit = (    
+                    self.cacheScore(promote_candidate_id) * read_rate_diff
+                    - self.cacheScore(demote_candidate_id) * read_rate_diff
+                )
+                if profit > cost:
+                    self.stats["upward_migrations"] += 1
+                    evict_task_0 = self.env.process(
+                        self.caches[0].evictObject(demote_candidate_id)
+                    )
+                    evict_task_1 = self.env.process(
+                        self.caches[1].evictObject(promote_candidate_id)
+                    )
+                    yield sp.AllOf(self.env, [evict_task_0, evict_task_1])
+                    self.caches[0].cur_size -= 1
+                    self.caches[1].cur_size -= 1
+                    self.caches[0].cacheObject(promote_candidate_id)
+                    self.caches[1].cacheObject(demote_candidate_id)
+                    t += 1
+                else:
+                    break

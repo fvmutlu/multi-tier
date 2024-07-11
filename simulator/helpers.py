@@ -78,7 +78,13 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
         case "none", "lfu":
             return LFUNode(env, node_id, kwargs["num_objects"])
         case "none", "wlfu":
-            return WLFUNode(env, node_id, kwargs["num_objects"], kwargs["vip_args"]["vip_win_size"], kwargs["vip_args"]["vip_slot_len"])
+            return WLFUNode(
+                env,
+                node_id,
+                kwargs["num_objects"],
+                kwargs["vip_args"]["vip_win_size"],
+                kwargs["vip_args"]["vip_slot_len"],
+            )
         case "none", "fifo":
             return FIFONode(env, node_id)
         case "none", "unif":
@@ -86,7 +92,14 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
         case "none", "palfu":
             return PALFUNode(env, node_id, kwargs["num_objects"], kwargs["pen_weight"])
         case "none", "pawlfu":
-            return PAWLFUNode(env, node_id, kwargs["num_objects"], kwargs["vip_args"]["vip_win_size"], kwargs["vip_args"]["vip_slot_len"], kwargs["pen_weight"])
+            return PAWLFUNode(
+                env,
+                node_id,
+                kwargs["num_objects"],
+                kwargs["vip_args"]["vip_win_size"],
+                kwargs["vip_args"]["vip_slot_len"],
+                kwargs["pen_weight"],
+            )
         case "rr", "none":
             return RoundRobinNode(env, node_id)
         case "rr", "lru":
@@ -110,7 +123,13 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
         case "lrt", "lfu":
             return LRTLFUNode(env, node_id, kwargs["num_objects"])
         case "lrt", "wlfu":
-            return LRTWLFUNode(env, node_id, kwargs["num_objects"], kwargs["vip_args"]["vip_win_size"], kwargs["vip_args"]["vip_slot_len"])
+            return LRTWLFUNode(
+                env,
+                node_id,
+                kwargs["num_objects"],
+                kwargs["vip_args"]["vip_win_size"],
+                kwargs["vip_args"]["vip_slot_len"],
+            )
         case "lrt", "fifo":
             return LRTFIFONode(env, node_id)
         case "lrt", "unif":
@@ -119,9 +138,18 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
             return LRTPALFUNode(
                 env, node_id, kwargs["num_objects"], kwargs["pen_weight"]
             )
+        case "lrt", "palfum":
+            return LRTPALFUMNode(
+                env, node_id, kwargs["num_objects"], kwargs["pen_weight"]
+            )
         case "lrt", "pawlfu":
             return LRTPAWLFUNode(
-                env, node_id, kwargs["num_objects"], kwargs["vip_args"]["vip_win_size"], kwargs["vip_args"]["vip_slot_len"], kwargs["pen_weight"]
+                env,
+                node_id,
+                kwargs["num_objects"],
+                kwargs["vip_args"]["vip_win_size"],
+                kwargs["vip_args"]["vip_slot_len"],
+                kwargs["pen_weight"],
             )
         case "vip", cache_pol if cache_pol in [
             "none",
@@ -195,7 +223,8 @@ def ignoreDudFilter(params):
         params["cache_pol"] in ["vip", "vip2", "vipsbw", "vipsbw2", "mvip", "mvipu"]
         and params["fwd_pol"] != "vip"
     ) or (
-        params["cache_pol"] in ["lru", "lfu", "wlfu", "unif", "fifo", "palfu", "pawlfu"]
+        params["cache_pol"]
+        in ["lru", "lfu", "wlfu", "unif", "fifo", "palfu", "palfum", "pawlfu"]
         and params["fwd_pol"] not in ["sp", "rr", "lrt"]
     ):
         return False
@@ -243,9 +272,10 @@ def ignoreDudFilter(params):
 
 def probDistGenerator(num_objects, dist_param=0.75, dist_type="zipf"):
     if "zipf" in dist_type:
-        tot = sum([1/(k**dist_param) for k in range(1, num_objects+1)])
-        dist = [1/(k**dist_param)/tot for k in range(1, num_objects+1)]
+        tot = sum([1 / (k**dist_param) for k in range(1, num_objects + 1)])
+        dist = [1 / (k**dist_param) / tot for k in range(1, num_objects + 1)]
         return dist
+
 
 def offlineRequestGenerator(
     nodes, num_objects, seed, stop_time, rate, dist_param, dist_type
@@ -289,7 +319,9 @@ def assignSources(seed, nodes, num_objects):
     source_map = {}
     for node_id in nodes:
         source_map[node_id] = [
-            object_id for object_id in range(num_objects) if source_map_inv[object_id] == node_id
+            object_id
+            for object_id in range(num_objects)
+            if source_map_inv[object_id] == node_id
         ]
 
     return source_map

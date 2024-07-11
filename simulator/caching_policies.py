@@ -4,7 +4,7 @@ import numpy as np
 # Builtin imports
 
 # Internal imports
-from .node import Node
+from .node import Node, UMNode
 from .utils import wique
 from .cache import FIFOCache
 
@@ -82,6 +82,11 @@ class PALFUNode(LFUNode):
                 self.env.process(self.decideCaching(victims[j]))
             else:
                 self.caches[j].cacheObject(object_id)
+
+
+class PALFUMNode(PALFUNode, UMNode):
+    def cacheScore(self, object_id):
+        return self.lfu_table[object_id]
 
 
 class WLFUNode(LFUNode):
