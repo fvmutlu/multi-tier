@@ -411,8 +411,8 @@ class MVIPUNode(MVIPNode, UMNode):
     def addCache(self, cache):
         MVIPNode.addCache(self,cache)
         if len(self.caches) > 1:
-            self.env.process(self.upwardMigrationProcess(10, 1))
-            self.stats["upward_migrations"] = 0
+            self.env.process(self.upwardMigrationProcess(10))
+            self.stats["upward_migration_count"] = 0
 
     def cacheScore(self, object_id):
         return self.cache_scores[object_id]
