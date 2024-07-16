@@ -229,6 +229,10 @@ def ignoreDudFilter(params):
         ]
     ):
         return False
+    
+    # Rule 6: If IA coefficient beta is non-zero, IA factor should be 1
+    if params["vip_ia_coeff"] != 0.0 and params["vip_ia_factor"] != 1.0:
+        return False
 
     # If no rules are violated, return True
     return True
