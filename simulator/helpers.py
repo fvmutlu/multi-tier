@@ -236,10 +236,9 @@ def ignoreDudFilter(params):
 
 def probDistGenerator(num_objects, dist_param=0.75, dist_type="zipf"):
     if "zipf" in dist_type:
-        return [
-            zipfian.pmf(k, dist_param, num_objects) for k in range(1, num_objects + 1)
-        ]
-
+        tot = sum([1/(k**dist_param) for k in range(1, num_objects+1)])
+        dist = [1/(k**dist_param)/tot for k in range(1, num_objects+1)]
+        return dist
 
 def offlineRequestGenerator(
     nodes, num_objects, seed, stop_time, rate, dist_param, dist_type
