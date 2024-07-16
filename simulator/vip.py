@@ -45,7 +45,7 @@ class VIPNode(Node):
         # self.stats["vip_count_sum"] = []
         # self.stats["pit_count_sum"] = []
         # self.stats["vip_caching_avg_time"] = 0
-        self.stats["vip_ia_factors"] = [0] * num_objects
+        # self.stats["vip_ia_factors"] = [0] * num_objects
 
         # Init VIP process
         self.env.process(self.vipProcess())
@@ -150,10 +150,6 @@ class VIPNode(Node):
             if benefit > 0:
                 cache.cacheObject(object_id)
             return
-
-    def getStats(self):
-        self.stats["vip_ia_factors"] = self.vip_ia_factor
-        return super().getStats()
     
     def vipForwarding(self):
         vip_allocs = defaultdict(list)
