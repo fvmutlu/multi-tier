@@ -153,6 +153,8 @@ def simRun(
     vip_inc=1,
     vip_slot_len=1,
     vip_win_size=100,
+    vip_ia_factor=1,
+    vip_ia_coeff=0,
     cache_capacities=[5, 100],
     cache_read_rates=[25, 10],
     cache_write_rates=[25, 5],
@@ -172,6 +174,8 @@ def simRun(
             "vip_inc": vip_inc,
             "vip_slot_len": vip_slot_len,
             "vip_win_size": vip_win_size,
+            "vip_ia_factor": vip_ia_factor,
+            "vip_ia_coeff": vip_ia_coeff,
         },
     }
     network.installNodes(num_nodes, fwd_pol, cache_pol, **additional_arguments)

@@ -33,6 +33,8 @@ class SimulationParameters:
     vip_inc: int = 1
     vip_slot_len: int = 1
     vip_win_size: int = 100
+    vip_ia_factor: float = 1.0
+    vip_ia_coeff: float = 0.0
     cache_capacities: Tuple[int] = (5, 100)
     cache_read_rates: Tuple[int] = (20, 10)
     cache_write_rates: Tuple[int] = (20, 10)
