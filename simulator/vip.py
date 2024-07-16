@@ -45,6 +45,7 @@ class VIPNode(Node):
         # self.stats["vip_count_sum"] = []
         # self.stats["pit_count_sum"] = []
         # self.stats["vip_caching_avg_time"] = 0
+        self.stats["vip_ia_factors"] = [0] * num_objects
 
         # Init VIP process
         self.env.process(self.vipProcess())
@@ -150,6 +151,10 @@ class VIPNode(Node):
                 cache.cacheObject(object_id)
             return
 
+    def getStats(self):
+        self.stats["vip_ia_factors"] = self.vip_ia_factor
+        return super().getStats()
+    
     def vipForwarding(self):
         vip_allocs = defaultdict(list)
 
@@ -280,6 +285,7 @@ class VIPNode(Node):
                 # Update IA factor
                 self.vip_ia_factor[k] *= (1 - self.vip_ia_coeff)
                 self.vip_ia_factor[k] += self.vip_ia_coeff * self.vip_rx[k]
+                self.vip_ia_factor[k] = max(self.vip_ia_factor[k], 1)
                 # Reset time slot rx vip count
                 self.vip_rx[k] = 0
 
