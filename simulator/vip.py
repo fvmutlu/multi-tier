@@ -34,6 +34,7 @@ class VIPNode(Node):
         ]
         self.cache_scores = [0] * num_objects
         self.neighbor_vip_counts = {}
+        self.neighbor_vip_ia_factors = {}
         self.neighbor_vip_tx = {}
         self.virtual_caches = []
 
@@ -53,6 +54,7 @@ class VIPNode(Node):
     def addInputLink(self, remote_id, link, ctrl_link):
         super().addInputLink(remote_id, link, ctrl_link)
         self.neighbor_vip_counts[remote_id] = [0] * self.num_objects
+        self.neighbor_vip_ia_factors[remote_id] = [0] * self.num_objects
 
     def addOutputLink(self, remote_id, link, ctrl_link):
         super().addOutputLink(remote_id, link, ctrl_link)
@@ -94,6 +96,10 @@ class VIPNode(Node):
         for object_id in fib:
             for remote_id in fib[object_id]:
                 self.neighbor_vip_tx[remote_id, object_id] = wique(maxlen=self.win_size)
+
+    def getStats(self):
+        #print(self.id, [self.vip_rx_windows[k].mean for k in range(10)])
+        return super().getStats()
 
     def receiveInterest(self, remote_id, request):
         if remote_id == self.id:
@@ -150,13 +156,14 @@ class VIPNode(Node):
             if benefit > 0:
                 cache.cacheObject(object_id)
             return
-    
+
     def vipForwarding(self):
         vip_allocs = defaultdict(list)
 
         for b in self.fib_inv:
             vip_diff = [
-                self.vip_counts[k] - self.neighbor_vip_counts[b][k]
+                self.vip_counts[k]
+                - self.neighbor_vip_counts[b][k] / self.neighbor_vip_ia_factors[b][k]
                 for k in self.fib_inv[b]
             ]
             k_star_index = np.argmax(vip_diff)
@@ -216,6 +223,16 @@ class VIPNode(Node):
                 self.neighbor_vip_counts[remote_id] = yield self.ctrl_in_links[
                     remote_id
                 ].getUpdate()
+
+            # Update neighbors' information with local node's VIP IA factors
+            for remote_id in self.ctrl_out_links:
+                self.ctrl_out_links[remote_id].pushIAFactors(self.vip_ia_factor)
+
+            # Update local node's VIP IA factors with neighbors' VIP IA factors
+            for remote_id in self.ctrl_in_links:
+                self.neighbor_vip_ia_factors[remote_id] = yield self.ctrl_in_links[
+                    remote_id
+                ].getIAFactors()
 
             # Determine virtual plane forwarding
             vip_allocs = self.vipForwarding()
@@ -279,7 +296,7 @@ class VIPNode(Node):
             for k in range(self.num_objects):
                 self.vip_rx_windows[k].append(self.vip_rx[k] / self.vip_ia_factor[k])
                 # Update IA factor
-                self.vip_ia_factor[k] *= (1 - self.vip_ia_coeff)
+                self.vip_ia_factor[k] *= 1 - self.vip_ia_coeff
                 self.vip_ia_factor[k] += self.vip_ia_coeff * self.vip_rx[k]
                 self.vip_ia_factor[k] = max(self.vip_ia_factor[k], 1)
                 # Reset time slot rx vip count

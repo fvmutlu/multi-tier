@@ -29,6 +29,7 @@ class VipLink(object):
         self.env = env
         self.update_pipe = sp.Store(env)
         self.vip_pipe = sp.Store(env)
+        self.ia_pipe = sp.Store(env)
 
     def pushUpdate(self, pkt):
         self.update_pipe.put(pkt)
@@ -41,6 +42,12 @@ class VipLink(object):
 
     def getVips(self):
         return self.vip_pipe.get()
+    
+    def pushIAFactors(self, pkt):
+        self.ia_pipe.put(pkt)
+    
+    def getIAFactors(self):
+        return self.ia_pipe.get()
 
 
 def getLink(env, link_cap, prop_delay):
