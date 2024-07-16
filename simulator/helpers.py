@@ -234,10 +234,9 @@ def ignoreDudFilter(params):
 
 def probDistGenerator(num_objects, dist_param=0.75, dist_type="zipf"):
     if "zipf" in dist_type:
-        return [
-            zipfian.pmf(k, dist_param, num_objects) for k in range(1, num_objects + 1)
-        ]
-
+        tot = sum([1/(k**dist_param) for k in range(1, num_objects+1)])
+        dist = [1/(k**dist_param)/tot for k in range(1, num_objects+1)]
+        return dist
 
 def offlineRequestGenerator(
     nodes, num_objects, seed, stop_time, rate, dist_param, dist_type
@@ -265,7 +264,7 @@ def assignRouting(G, node_ids, source_map):
     fibs = {}
     for node_id in node_ids:
         fibs[node_id] = defaultdict(list)
-        for source_node_id, objects in enumerate(source_map):
+        for source_node_id, objects in source_map.items():
             if objects and (node_id != source_node_id):
                 paths = [p for p in nx.all_shortest_paths(G, node_id, source_node_id)]
                 next_hops = [p[1] for p in paths]
@@ -278,13 +277,10 @@ def assignRouting(G, node_ids, source_map):
 def assignSources(seed, nodes, num_objects):
     rng = default_rng(seed)
     source_map_inv = rng.choice(nodes, size=num_objects, replace=True)
-    source_map = [
-        [
-            object_id
-            for object_id in range(num_objects)
-            if source_map_inv[object_id] == node_id
+    source_map = {}
+    for node_id in nodes:
+        source_map[node_id] = [
+            object_id for object_id in range(num_objects) if source_map_inv[object_id] == node_id
         ]
-        for node_id in nodes
-    ]
 
     return source_map

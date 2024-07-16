@@ -11,7 +11,7 @@ from urllib.request import urlopen
 
 # Internal imports
 from simulator.helpers import SimulationParameters, simConfigToParamSets
-from simulator.topologies import topologies
+from simulator.topologies import topologies, getRandomTopology
 
 def dictsToParamSets(param_dicts: List[dict]) -> List[SimulationParameters]:
     for param_set in param_dicts:
@@ -80,7 +80,8 @@ def singleEntrySumDataFieldAcrossNodes(top_name: str, db_entry: dict, field: str
     elif "num_nodes" in topologies[top_name]["top_args"].keys():
         num_nodes = topologies[top_name]["top_args"]["num_nodes"]
     else:
-        print("Topology has no parameter num_nodes")
+        tmp_G = getRandomTopology(top_name, **topologies[top_name]["top_args"])
+        num_nodes = len(tmp_G.nodes)
     if isinstance(db_entry["data"]["0"][field], (int, float)):
         return sum([db_entry["data"][str(node)][field] for node in range(num_nodes)])
     elif isinstance(db_entry["data"]["0"][field], (list, tuple)):

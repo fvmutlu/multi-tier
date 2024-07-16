@@ -41,6 +41,7 @@ env:
     DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
     DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
     IMAGE_NAME: multi-tier
+    BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
 
 jobs:   
     run-custom-experiment:
@@ -48,15 +49,15 @@ jobs:
         timeout-minutes: 1200
         steps:
           - name: Pull Docker image
-            run: docker pull ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+            run: docker pull ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.BRANCH_NAME }}
           - name: Run experiment
             run: |
               mkdir -p ~/actions-artifacts
               mkdir -p ~/actions-artifacts/sim_outputs
-              docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m simulator.sim_runner -e=${{ inputs.name }} -t=${{ inputs.topology }} --config_url=${{ inputs.config_url }}
+              docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.BRANCH_NAME }} python3 -m simulator.sim_runner -e=${{ inputs.name }} -t=${{ inputs.topology }} --config_url=${{ inputs.config_url }}
           - name: Plot results
             continue-on-error: true
-            run: docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest python3 -m data_analysis.custom_plotter -e=${{ inputs.name }} -t=${{ inputs.topology }} --config_url=${{ inputs.config_url }} --x_label=${{ inputs.x_label }} --metric=${{ inputs.metric }} --curve_label=${{ inputs.curve_label }}
+            run: docker run --rm -v ~/actions-artifacts/sim_outputs:/multi-tier/sim_outputs ${{ env.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.BRANCH_NAME }} python3 -m data_analysis.custom_plotter -e=${{ inputs.name }} -t=${{ inputs.topology }} --config_url=${{ inputs.config_url }} --x_label=${{ inputs.x_label }} --metric=${{ inputs.metric }} --curve_label=${{ inputs.curve_label }}
           - name: Get current date and time
             id: date-time
             run: echo "DATETIME=$(date +'%Y-%m-%d_%H-%M')" >> "$GITHUB_OUTPUT"
