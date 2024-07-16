@@ -202,7 +202,7 @@ class VIPNode(Node):
                 self.vip_counts[k] = max(self.vip_counts[k] - cache_decrement, 0)
 
     def vipProcess(self):
-        #avg_cpu_time, cpu_counter = 0, 0
+        # avg_cpu_time, cpu_counter = 0, 0
         while True:
             # Set VIP counts to 0 for all sourced objects
             if self.is_source:
@@ -222,7 +222,7 @@ class VIPNode(Node):
             # Determine virtual plane forwarding
             vip_allocs = self.vipForwarding()
 
-            #tic = time.perf_counter()
+            # tic = time.perf_counter()
             if self.has_caches:
                 # Update cache scores for use outside virtual plane (this can be different for variants)
                 self.updateVipCacheScores()
@@ -230,9 +230,9 @@ class VIPNode(Node):
                 self.vipCaching()
                 # Decrement VIP counts due to caching
                 self.drainVipsByCaching()
-            #toc = time.perf_counter()
-            #avg_cpu_time, cpu_counter = (avg_cpu_time * cpu_counter + (toc - tic)) / (cpu_counter + 1), cpu_counter + 1
-            #self.stats["vip_caching_avg_time"] = avg_cpu_time
+            # toc = time.perf_counter()
+            # avg_cpu_time, cpu_counter = (avg_cpu_time * cpu_counter + (toc - tic)) / (cpu_counter + 1), cpu_counter + 1
+            # self.stats["vip_caching_avg_time"] = avg_cpu_time
 
             # Determine actual amount of VIPs that will be forwarded
             fwd_vips = {}
@@ -346,21 +346,21 @@ class VIPSBW2Node(VIP2Node):
                 i += 1
 
         return vip_allocs
-    
+
     def drainVipsByCaching(self):
         for j, cache in enumerate(self.caches):
             if self.virtual_caches[j]:
                 cache_decrement = self.slot_len * cache.read_rate
                 sorted_k = sorted(
-                    self.virtual_caches[j], key=lambda k: self.cache_scores[k], reverse=True
+                    self.virtual_caches[j],
+                    key=lambda k: self.cache_scores[k],
+                    reverse=True,
                 )
                 i = 0
                 while cache_decrement > 0 and i < len(sorted_k):
                     k_star = sorted_k[i]
                     vip_dec = min(self.vip_counts[k_star], cache_decrement)
-                    self.vip_counts[k_star] = max(
-                        self.vip_counts[k_star] - vip_dec, 0
-                    )
+                    self.vip_counts[k_star] = max(self.vip_counts[k_star] - vip_dec, 0)
                     cache_decrement -= vip_dec
                     i += 1
 
@@ -460,3 +460,36 @@ class MVIPNode(VIPNode):
             if cost_matrix[i][k] >= 0 and k in self.cacheable_objects:
                 self.virtual_caches[self.tier_mapping[i]].add(k)
                 self.virtual_object_locs[k] = self.tier_mapping[i]
+
+
+class MVIPSBWNode(MVIPNode):
+    def __init__(self, env, node_id, num_objects, pen_weight, **vip_args):
+        super().__init__(env, node_id, num_objects, pen_weight, **vip_args)
+        self.vip_cache_tx_windows = {}
+
+    def addCache(self, cache):
+        super().addCache(cache)
+        for object_id in self.cacheable_objects:
+            self.vip_cache_tx_windows[len(self.caches) - 1, object_id] = wique(
+                maxlen=self.win_size
+            )
+
+    def updateVipCacheScores(self):
+        for k in self.cacheable_objects:
+            self.cache_scores[k] = self.vip_rx_windows[k].mean
+
+    def vipCaching(self):
+        # Sort from highest to lowest cache score
+        sorted_cache_scores = np.flip(np.sort(self.cache_scores))
+        # Obtain object ids for sorted scores
+        sorted_cache_scores_idx = np.flip(np.argsort(self.cache_scores))
+        for j, cache in enumerate(self.caches):
+            if sorted_cache_scores[j] > 0:
+                self.vip_cache_tx_windows[j, sorted_cache_scores_idx[j]].append(
+                    cache.read_rate
+                )
+        for k in self.cacheable_objects:
+            if k in sorted_cache_scores_idx[: len(self.caches)]:
+                continue
+            for j in range(len(self.caches)):
+                self.vip_cache_tx_windows[j, k].append(0)
