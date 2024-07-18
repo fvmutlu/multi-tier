@@ -159,17 +159,7 @@ class FIFONode(Node):
             cache.read_penalty,
             cache.write_penalty,
         )
-        if self.has_caches:
-            for j, existing_cache in enumerate(self.caches):
-                if fifocache.read_rate >= existing_cache.read_rate:
-                    self.caches.insert(j, fifocache)
-                    break
-            if j == len(self.caches) - 1:
-                self.caches.append(fifocache)
-        else:
-            self.caches = [fifocache]
-            self.has_caches = True
-        self.env.process(fifocache.cacheController())
+        super().addCache(fifocache)
 
     def decideCaching(self, object_id):
         for j, cache in enumerate(self.caches):
