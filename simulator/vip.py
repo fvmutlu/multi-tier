@@ -427,8 +427,8 @@ class MVIPNode(VIPNode):
             # Update cache score
             # self.cache_scores[k] = self.vip_rx_windows[k].mean
             # The cs_k values act as temp scores for MVIP
-            # cs_k = self.cache_scores[k]
-            cs_k = self.vip_counts[k]
+            cs_k = self.cache_scores[k]
+            # cs_k = self.vip_counts[k]
             for j, cache in enumerate(self.caches):
                 tier_slice = self.tier_slices[j]
                 if object_loc == j:
@@ -474,22 +474,43 @@ class MVIPSBWNode(MVIPNode):
                 maxlen=self.win_size
             )
 
+    def decideCaching(self, object_id):
+        tier_avgs = [
+            self.vip_cache_tx_windows[j, object_id].mean
+            for j in range(len(self.caches))
+        ]
+        j_star = np.argmax(tier_avgs)
+        if tier_avgs[j_star] > 0:
+            cache = self.caches[j_star]
+            if cache.isFull():
+                victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
+                if self.cache_scores[object_id] > self.cache_scores[victim_id]:
+                    yield self.env.process(cache.replaceObject(victim_id, object_id))
+                    object_id = victim_id
+            else:
+                cache.cacheObject(object_id)
+
     def updateVipCacheScores(self):
         for k in self.cacheable_objects:
             self.cache_scores[k] = self.vip_rx_windows[k].mean
 
     def vipCaching(self):
-        # Sort from highest to lowest cache score
-        sorted_cache_scores = np.flip(np.sort(self.cache_scores))
         # Obtain object ids for sorted scores
         sorted_cache_scores_idx = np.flip(np.argsort(self.cache_scores))
+        sorted_cache_scores_idx = [k for k in sorted_cache_scores_idx if k in self.cacheable_objects]
+        done_pairs = []
+        for j, k in enumerate(sorted_cache_scores_idx[: len(self.caches)]):
+            if self.cache_scores[k] > 0:
+                self.vip_cache_tx_windows[j, k].append(self.slot_len * self.caches[j].read_rate)
+                done_pairs.append((j, k))
+        for j in range(len(self.caches)):
+            for k in self.cacheable_objects:
+                if (j, k) not in done_pairs:
+                    self.vip_cache_tx_windows[j, k].append(0)
+
+    def drainVipsByCaching(self):
         for j, cache in enumerate(self.caches):
-            if sorted_cache_scores[j] > 0:
-                self.vip_cache_tx_windows[j, sorted_cache_scores_idx[j]].append(
-                    cache.read_rate
+            for k in self.cacheable_objects:
+                self.vip_counts[k] = max(
+                    self.vip_counts[k] - self.vip_cache_tx_windows[j, k][-1], 0
                 )
-        for k in self.cacheable_objects:
-            if k in sorted_cache_scores_idx[: len(self.caches)]:
-                continue
-            for j in range(len(self.caches)):
-                self.vip_cache_tx_windows[j, k].append(0)

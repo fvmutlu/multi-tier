@@ -251,6 +251,9 @@ class wique:
         self.q = deque(maxlen=maxlen)
         self.mean = 0
         self.sum = 0
+    
+    def __getitem__(self, index):
+        return self.q[index]
 
     def append(self, x: int) -> None:
         """
