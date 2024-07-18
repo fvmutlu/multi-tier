@@ -284,6 +284,12 @@ class IANode(Node):
     def __init__(self, env, node_id):
         super().__init__(env, node_id)
         self.pit = defaultdict(list)
+        self.stats["agg_interests"] = 0
+        self.stats["response_counts"] = [0, 0]
+
+    def addCache(self, cache):
+        super().addCache(cache)
+        self.stats["response_counts"].append(0)
 
     def receiveInterest(self, remote_id, request):
         request.logEvent(self.id)
@@ -292,6 +298,7 @@ class IANode(Node):
         object_location = self.locateObject(object_id)
 
         if self.pit[object_id]:
+            self.stats["agg_interests"] += 1
             self.pit[object_id].append((remote_id, request))
         else:
             if object_location == -2:
@@ -300,13 +307,23 @@ class IANode(Node):
                 self.env.process(self.respondWithLocal(request, object_location))
             self.pit[object_id].append((remote_id, request))
 
-    def receiveData(self, request):
+    def respondWithLocal(self, request, object_location):
+        object_id = request.object_id
+        if object_location == -1:
+            yield self.env.process(self.permastore.readObject(object_id))
+        else:
+            yield self.env.process(self.caches[object_location].readObject(object_id))
+
+        self.receiveData(request, source=object_location)
+
+    def receiveData(self, request, source=-2):
         """
         Satisfy a locally generated exogenous interest with arriving data, or forward data to remote node with matching PIT entry.
         """
         object_id = request.object_id
 
         if object_id in self.pit.keys() and self.pit[object_id]:
+            self.stats["response_counts"][source+2] += len(self.pit[object_id])
             while self.pit[object_id]:
                 remote_id, pending_req = self.pit[object_id].pop(0)
                 pending_req.logEvent(self.id)

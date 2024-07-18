@@ -1,6 +1,6 @@
 {
-    "fwd_pol"                : ["vip"],
-    "cache_pol"              : ["mvip"],
+    "fwd_pol"                : ["lrt","vip"],
+    "cache_pol"              : ["lfu","mvip"],
     "num_objects"            : [2000],
     "source_read_rate"       : [1000],
     "source_map_seed"        : [1],
@@ -11,13 +11,13 @@
     "request_dist_type"      : ["zipf"],
     "pen_weight"             : [0],
     "vip_inc"                : [1],
-    "vip_slot_len"           : [1],
+    "vip_slot_len"           : [4],
     "vip_win_size"           : [100],
     "vip_ia_factor"          : [1.0],
     "vip_ia_coeff"           : [0.0],
-    "cache_capacities"       : [[5,100]],
-    "cache_read_rates"       : [[25,10]],
-    "cache_write_rates"      : [[25,5]],
-    "cache_read_pens"        : [[0,0]],
-    "cache_write_pens"       : [[0,0]]
+    "cache_capacities"       : [[5],[5,25],[5,50],[5,75],[5,100]],
+    "cache_read_rates"       : [[25],[25,10]],
+    "cache_write_rates"      : [[25],[25,5]],
+    "cache_read_pens"        : [[2],[2,1]],
+    "cache_write_pens"       : [[4],[4,2]]
 }
