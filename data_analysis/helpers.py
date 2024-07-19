@@ -3,24 +3,72 @@ import numpy as np
 
 # Builtin imports
 import json
-from typing import List, Tuple, Callable, Any
+from typing import List, Tuple, Callable, Any, Union
 from copy import copy, deepcopy
 from itertools import product
 from os.path import isfile
 from urllib.request import urlopen
+from dataclasses import dataclass
+from hashlib import sha256
 
 # Internal imports
 from simulator.helpers import SimulationParameters, simConfigToParamSets
 from simulator.topologies import topologies, getRandomTopology
 
-def dictsToParamSets(param_dicts: List[dict]) -> List[SimulationParameters]:
+@dataclass(eq=True, frozen=True)
+class LegacySimulationParameters:
+    fwd_pol: str = "none"
+    cache_pol: str = "none"
+    num_objects: int = 1000
+    source_read_rate: int = 1000
+    source_map_seed: int = 1
+    request_generator_seed: int = 1
+    stop_time: int = 100
+    request_rate: int = 10
+    request_dist_param: float = 0.75
+    request_dist_type: str = "zipf"
+    pen_weight: int = 0
+    vip_inc: int = 1
+    vip_slot_len: int = 1
+    vip_win_size: int = 100
+    cache_capacities: Tuple[int] = (5, 100)
+    cache_read_rates: Tuple[int] = (20, 10)
+    cache_write_rates: Tuple[int] = (20, 10)
+    cache_read_pens: Tuple[int] = (2, 1)
+    cache_write_pens: Tuple[int] = (4, 2)
+
+    def __iter__(self):
+        return iter(self.__dict__.items())
+
+    def items(self):
+        return self.__dict__.items()
+
+    def keys(self):
+        return self.__dict__.keys()
+
+    def values(self):
+        return self.__dict__.values()
+
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    def __repr__(self):
+        return ",".join([f"{key}={value}" for key, value in self.items()])
+
+    def __hash__(self):
+        return int(sha256(self.__repr__().encode()).hexdigest(), 16)
+
+def dictsToParamSets(param_dicts: List[dict], legacy: bool = False) -> List[SimulationParameters] | List[LegacySimulationParameters]:
     for param_set in param_dicts:
         param_set["cache_capacities"] = tuple(param_set["cache_capacities"])
         param_set["cache_read_rates"] = tuple(param_set["cache_read_rates"])
         param_set["cache_write_rates"] = tuple(param_set["cache_write_rates"])
         param_set["cache_read_pens"] = tuple(param_set["cache_read_pens"])
         param_set["cache_write_pens"] = tuple(param_set["cache_write_pens"])
-    return [SimulationParameters(**param_set) for param_set in param_dicts]
+    if legacy:
+        return [LegacySimulationParameters(**param_set) for param_set in param_dicts]
+    else:
+        return [SimulationParameters(**param_set) for param_set in param_dicts]
 
 
 def getTestConfig(config_path: str):
@@ -40,7 +88,7 @@ def getJsonDb(db_filepath: str) -> dict:
 
 
 def filterParamList(
-    input_param_list: List[SimulationParameters],
+    input_param_list: List[SimulationParameters] | List[LegacySimulationParameters],
     filters: List[Tuple[str, Any, Callable]],
 ):
     param_list = deepcopy(input_param_list)
@@ -70,7 +118,7 @@ def filterParamList(
     return param_list
 
 
-def getParamHashList(param_list: List[SimulationParameters]):
+def getParamHashList(param_list: List[SimulationParameters] | List[LegacySimulationParameters]):
     return [str(hash(sp)) for sp in param_list]
 
 
@@ -105,7 +153,7 @@ def getDataFieldSumsAcrossEntries(
 def getDataFieldSumAvgsAcrossSeeds(
     top_name: str,
     db: dict,
-    param_list: List[SimulationParameters],
+    param_list: List[SimulationParameters] | List[LegacySimulationParameters],
     source_map_seeds: List[int],
     request_generator_seeds: List[int],
     field: str,
@@ -133,36 +181,6 @@ def getDataFieldSumAvgsAcrossSeeds(
                 )
         
     return accumulator / num_runs
-
-
-def avgDataFieldSumsAcrossSeeds(
-    top_name: str, db: dict, param_list: List[SimulationParameters], field: str
-):
-    groups = []
-    while param_list:
-        current_dict = param_list.pop(0)
-        group = [current_dict]
-        i = 0
-        while i < len(param_list):
-            other_dict = param_list[i]
-            if all(
-                current_dict[key] == other_dict[key]
-                for key in current_dict.keys()
-                if key != "source_map_seed" and key != "request_generator_seed"
-            ):
-                group.append(other_dict)
-                param_list.pop(i)
-            else:
-                i += 1
-        groups.append(group)
-
-    averages = []
-    for group in groups:
-        group_hashes = getParamHashList(group)
-        group_sums = getDataFieldSumsAcrossEntries(top_name, db, group_hashes, field)
-        averages.append(np.mean(group_sums, axis=0))
-
-    return averages
 
 
 def getCustomParamList(
