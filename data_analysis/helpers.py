@@ -94,11 +94,11 @@ def singleEntrySumDataFieldAcrossNodes(top_name: str, db_entry: dict, field: str
 
 
 def getDataFieldSumsAcrossEntries(
-    top_name: str, db: dict, entry_hashes: List[str], field: str
+    top_name: str, db: dict, entry_hashes: List[str], field: str, nodes: List[int] = None
 ):
     return np.array(
         [
-            singleEntrySumDataFieldAcrossNodes(top_name, db[hash], field)
+            singleEntrySumDataFieldAcrossNodes(top_name, db[hash], field, nodes)
             for hash in entry_hashes
         ]
     )
@@ -111,6 +111,7 @@ def getDataFieldSumAvgsAcrossSeeds(
     source_map_seeds: List[int],
     request_generator_seeds: List[int],
     field: str,
+    nodes: List[int] = None,
 ):
     num_runs = len(source_map_seeds) * len(request_generator_seeds)
     accumulator = None
@@ -124,13 +125,13 @@ def getDataFieldSumAvgsAcrossSeeds(
             run_param_hashes = getParamHashList(run_param_list)
             if accumulator is None:
                 accumulator = getDataFieldSumsAcrossEntries(
-                    top_name, db, run_param_hashes, field
+                    top_name, db, run_param_hashes, field, nodes
                 )
             else:
                 accumulator = np.add(
                     accumulator,
                     getDataFieldSumsAcrossEntries(
-                        top_name, db, run_param_hashes, field
+                        top_name, db, run_param_hashes, field, nodes
                     ),
                 )
         
