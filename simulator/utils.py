@@ -254,8 +254,13 @@ class wique:
     
     def __getitem__(self, index):
         return self.q[index]
+    
+    def __setitem__(self, index, value):
+        self.sum += value - self.q[index]
+        self.mean = self.sum / self.curlen
+        self.q[index] = value
 
-    def append(self, x: int) -> None:
+    def append(self, x: int | float) -> None:
         """
         Adds a new element to the window, updating mean and sum accordingly.
 
@@ -270,3 +275,14 @@ class wique:
             self.sum = self.sum - self.q[0] + x
             self.mean = self.sum / self.maxlen
         self.q.append(x)
+
+    def pop(self) -> int | float:
+        """
+        Removes the rightmost element from the window, updating mean and sum accordingly.
+        """
+        if self.curlen > 0:
+            element = self.q.pop()
+            self.sum -= element
+            self.curlen -= 1
+            self.mean = self.sum / self.curlen if self.curlen > 0 else 0
+        return element

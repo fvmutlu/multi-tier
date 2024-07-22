@@ -428,7 +428,6 @@ class MVIPNode(VIPNode):
             # self.cache_scores[k] = self.vip_rx_windows[k].mean
             # The cs_k values act as temp scores for MVIP
             cs_k = self.cache_scores[k]
-            # cs_k = self.vip_counts[k]
             for j, cache in enumerate(self.caches):
                 tier_slice = self.tier_slices[j]
                 if object_loc == j:
@@ -497,11 +496,15 @@ class MVIPSBWNode(MVIPNode):
     def vipCaching(self):
         # Obtain object ids for sorted scores
         sorted_cache_scores_idx = np.flip(np.argsort(self.cache_scores))
-        sorted_cache_scores_idx = [k for k in sorted_cache_scores_idx if k in self.cacheable_objects]
+        sorted_cache_scores_idx = [
+            k for k in sorted_cache_scores_idx if k in self.cacheable_objects
+        ]
         done_pairs = []
         for j, k in enumerate(sorted_cache_scores_idx[: len(self.caches)]):
             if self.cache_scores[k] > 0:
-                self.vip_cache_tx_windows[j, k].append(self.slot_len * self.caches[j].read_rate)
+                self.vip_cache_tx_windows[j, k].append(
+                    self.slot_len * self.caches[j].read_rate
+                )
                 done_pairs.append((j, k))
         for j in range(len(self.caches)):
             for k in self.cacheable_objects:
@@ -511,6 +514,153 @@ class MVIPSBWNode(MVIPNode):
     def drainVipsByCaching(self):
         for j, cache in enumerate(self.caches):
             for k in self.cacheable_objects:
-                self.vip_counts[k] = max(
-                    self.vip_counts[k] - self.vip_cache_tx_windows[j, k][-1], 0
+                self.vip_cache_tx_windows[j, k][-1] = min(
+                    self.vip_cache_tx_windows[j, k][-1], self.vip_counts[k]
                 )
+                self.vip_counts[k] = (
+                    self.vip_counts[k] - self.vip_cache_tx_windows[j, k][-1]
+                )
+
+class MVIPSBW2Node(MVIPSBWNode):
+    def decideCaching(self, object_id):
+        tier_avgs = [
+            self.vip_cache_tx_windows[j, object_id].mean
+            for j in range(len(self.caches))
+        ]
+        j_star = np.argmax(tier_avgs)
+        link_avgs = [self.neighbor_vip_tx[remote_id, object_id].mean for remote_id in self.fib_inv]
+        #print(self.id, object_id, tier_avgs, link_avgs)
+        if tier_avgs[j_star] > max(link_avgs):
+            cache = self.caches[j_star]
+            if cache.isFull():
+                victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
+                if self.cache_scores[object_id] > self.cache_scores[victim_id]:
+                    yield self.env.process(cache.replaceObject(victim_id, object_id))
+                    object_id = victim_id
+            else:
+                cache.cacheObject(object_id)
+    
+    def vipCaching(self):
+        # Obtain object ids for sorted scores
+        sorted_cache_scores_idx = np.flip(np.argsort(self.cache_scores))
+        sorted_cache_scores_idx = [
+            k for k in sorted_cache_scores_idx if k in self.cacheable_objects and self.cache_scores[k] > 0
+        ]
+        allocs = {j:defaultdict(int) for j in range(len(self.caches))}
+        for j, cache in enumerate(self.caches):
+            bw = self.slot_len * cache.read_rate
+            cap = cache.capacity
+            i = 0
+            for k in sorted_cache_scores_idx:
+                alloc = min(bw, self.vip_counts[k])
+                allocs[j][k] = alloc
+                bw -= alloc
+                cap -= 1
+                i += 1
+                if bw <= 0 or cap <= 0:
+                    break
+            sorted_cache_scores_idx = sorted_cache_scores_idx[i:]
+        for j in range(len(self.caches)):
+            for k in self.cacheable_objects:
+                self.vip_cache_tx_windows[j, k].append(allocs[j][k])
+    
+    def vipForwarding(self):
+        fwd_vips = {}
+        vip_diffs = []
+        for b in self.fib_inv:
+            fwd_vips[b] = defaultdict(int)
+            for k in self.fib_inv[b]:
+                vip_diff = self.vip_counts[k] - self.neighbor_vip_counts[b][k]
+                vip_diffs.append((vip_diff, b, k))
+        vip_diffs.sort(reverse=True)
+        
+        link_bws = {b: self.slot_len * self.out_links[b].link_cap for b in self.fib_inv}
+        for vip_diff, b, k in vip_diffs:
+            if vip_diff <= 0:
+                break
+            if all([bw <= 0 for bw in link_bws.values()]):
+                break
+            if link_bws[b] > 0 and self.vip_counts[k] > 0:
+                alloc = min(self.vip_counts[k], link_bws[b])
+                fwd_vips[b][k] = alloc
+                link_bws[b] -= alloc
+                self.vip_counts[k] -= alloc
+
+        return fwd_vips
+    
+    def vipProcess(self):
+        # avg_cpu_time, cpu_counter = 0, 0
+        while True:
+            # Set VIP counts to 0 for all sourced objects
+            if self.is_source:
+                for k in self.permastore.contents:
+                    self.vip_counts[k] = 0
+
+            # Update neighbors' information with local node's VIP counts
+            for remote_id in self.ctrl_out_links:
+                self.ctrl_out_links[remote_id].pushUpdate(self.vip_counts)
+
+            # Update local node's VIP information with neighbors' VIP counts
+            for remote_id in self.ctrl_in_links:
+                self.neighbor_vip_counts[remote_id] = yield self.ctrl_in_links[
+                    remote_id
+                ].getUpdate()
+
+            # Determine virtual plane forwarding
+            # vip_allocs = self.vipForwarding()
+
+            # tic = time.perf_counter()
+            if self.has_caches:
+                # Update cache scores for use outside virtual plane (this can be different for variants)
+                self.updateVipCacheScores()
+                # Determine virtual plane caching
+                self.vipCaching()
+                # Decrement VIP counts due to caching
+                self.drainVipsByCaching()
+            # toc = time.perf_counter()
+            # avg_cpu_time, cpu_counter = (avg_cpu_time * cpu_counter + (toc - tic)) / (cpu_counter + 1), cpu_counter + 1
+            # self.stats["vip_caching_avg_time"] = avg_cpu_time
+
+            # Determine actual amount of VIPs that will be forwarded
+            fwd_vips = self.vipForwarding()
+
+            # Send VIPs
+            for remote_id in self.ctrl_out_links:
+                if remote_id in fwd_vips:
+                    self.ctrl_out_links[remote_id].pushVips(fwd_vips[remote_id])
+                    for object_id in self.fib_inv[remote_id]:
+                        # Record TX VIP stats
+                        self.neighbor_vip_tx[remote_id, object_id].append(
+                            fwd_vips[remote_id][object_id]
+                        )
+                else:
+                    self.ctrl_out_links[remote_id].pushVips({})
+
+            # Update local VIP counts with sent VIPs
+            for b in self.fib_inv:
+                for k in self.fib:
+                    self.vip_counts[k] = max(0, self.vip_counts[k] - fwd_vips[b][k])
+
+            # Wait for slot length duration and increment VIP counts due to
+            # exogenous arrivals
+            yield self.env.timeout(self.slot_len)
+
+            # Receive VIPs from neighbors, increment VIP counts accordingly and
+            # update VIP RX windows
+            for remote_id in self.ctrl_in_links:
+                rx_vips = yield self.ctrl_in_links[remote_id].getVips()
+                for object_id in rx_vips:
+                    self.vip_counts[object_id] += rx_vips[object_id]
+                    self.vip_rx[object_id] += rx_vips[object_id]
+            for k in range(self.num_objects):
+                self.vip_rx_windows[k].append(self.vip_rx[k])
+                self.vip_rx[k] = 0
+
+            # Update VIP stats
+            # self.stats["vip_count_sum"].append(sum(self.vip_counts))
+            # self.stats["pit_count_sum"].append(sum([len(q) for q in self.pit.values()]))
+            """ if self.has_caches:
+                for j, cache in enumerate(self.caches):
+                    self.stats["vip_rx_avg_in_cache"][j].append(
+                        sum([self.vip_rx_windows[k].mean for k in cache.contents])
+                    ) """

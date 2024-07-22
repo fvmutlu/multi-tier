@@ -131,6 +131,7 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
             "vipsbw2",
             "mvip",
             "mvipsbw",
+            "mvipsbw2",
         ]:
             match cache_pol:
                 case cache_pol if cache_pol in ["none", "vip"]:
@@ -181,6 +182,14 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
                         kwargs["pen_weight"],
                         **kwargs["vip_args"],
                     )
+                case "mvipsbw2":
+                    return MVIPSBW2Node(
+                        env,
+                        node_id,
+                        kwargs["num_objects"],
+                        kwargs["pen_weight"],
+                        **kwargs["vip_args"],
+                    )
         case _, _:
             print("fwd_pol: {}, cache_pol: {}".format(fwd_pol, cache_pol))
             raise ValueError("No node with the specified policies exist.")
@@ -192,7 +201,7 @@ def ignoreDudFilter(params):
     # of fwd/cache policies, except for the "none" cache policy which can be matched
     # with any fwd policy.
     if (
-        params["cache_pol"] in ["vip", "vip2", "vipsbw", "vipsbw2", "mvip", "mvipsbw"]
+        params["cache_pol"] in ["vip", "vip2", "vipsbw", "vipsbw2", "mvip", "mvipsbw", "mvipsbw2"]
         and params["fwd_pol"] != "vip"
     ) or (
         params["cache_pol"] in ["lru", "lfu", "wlfu", "unif", "fifo", "palfu", "pawlfu"]
