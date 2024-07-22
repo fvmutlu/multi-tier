@@ -13,9 +13,9 @@
     "vip_inc"                : [1],
     "vip_slot_len"           : [1,2,4],
     "vip_win_size"           : [100],
-    "cache_capacities"       : [[5,75]],
-    "cache_read_rates"       : [[25,10]],
-    "cache_write_rates"      : [[25,5]],
-    "cache_read_pens"        : [[0,0]],
-    "cache_write_pens"       : [[0,0]]
+    "cache_capacities"       : [[5]],
+    "cache_read_rates"       : [[25]],
+    "cache_write_rates"      : [[25]],
+    "cache_read_pens"        : [[0]],
+    "cache_write_pens"       : [[0]]
 }
