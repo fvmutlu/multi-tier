@@ -528,8 +528,8 @@ class MVIPSBW2Node(MVIPSBWNode):
             for j in range(len(self.caches))
         ]
         j_star = np.argmax(tier_avgs)
-        link_avgs = [self.neighbor_vip_tx[remote_id, object_id].mean for remote_id in self.fib_inv]
-        #print(self.id, object_id, tier_avgs, link_avgs)
+        valid_links = [remote_id for remote_id in self.fib[object_id]]
+        link_avgs = [self.neighbor_vip_tx[remote_id, object_id].mean for remote_id in valid_links]
         if tier_avgs[j_star] > max(link_avgs):
             cache = self.caches[j_star]
             if cache.isFull():
