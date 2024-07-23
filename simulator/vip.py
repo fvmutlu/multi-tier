@@ -336,6 +336,21 @@ class VIPSBW2Node(VIPNode):
         for object_id in self.cacheable_objects:
             self.vip_cache_tx_windows[object_id] = wique(maxlen=self.win_size)
 
+    def decideCaching(self, object_id):
+        cache_avg = self.vip_cache_tx_windows[object_id].mean
+        valid_links = [remote_id for remote_id in self.fib[object_id]]
+        link_avgs = [
+            self.neighbor_vip_tx[remote_id, object_id].mean for remote_id in valid_links
+        ]
+        if cache_avg > max(link_avgs):
+            cache = self.caches[0]
+            if cache.isFull():
+                victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
+                if self.cache_scores[object_id] > self.cache_scores[victim_id]:
+                    yield self.env.process(cache.replaceObject(victim_id, object_id))
+            else:
+                cache.cacheObject(object_id)
+
     def updateVipCacheScores(self):
         for k in self.cacheable_objects:
             self.cache_scores[k] = self.vip_rx_windows[k].mean
@@ -374,9 +389,9 @@ class VIPSBW2Node(VIPNode):
             )
 
             invalid_pairs = np.full((n_links, self.num_objects), True)
-            for remote_id in self.fib_inv:
+            for i, remote_id in enumerate(self.fib_inv):
                 for k in self.fib_inv[remote_id]:
-                    invalid_pairs[remote_id, k] = False
+                    invalid_pairs[i, k] = False
 
             if self.has_caches:
                 V_matrix = np.vstack((V_matrix, V))
@@ -385,47 +400,48 @@ class VIPSBW2Node(VIPNode):
                     link_caps, self.slot_len * self.caches[0].read_rate
                 )
 
-            # CVXPY Variables
-            if self.has_caches:
-                X = cp.Variable((n_links + 1, self.num_objects), integer=True)  # Resource allocations
-                invalid_pairs = np.vstack(
-                    (invalid_pairs, np.full(self.num_objects, False))
-                )
-            else:
-                X = cp.Variable((n_links, self.num_objects), integer=True)
+            if n_links > 0:            
+                # CVXPY Variables
+                if self.has_caches:
+                    X = cp.Variable((n_links + 1, self.num_objects), integer=True)  # Resource allocations
+                    invalid_pairs = np.vstack(
+                        (invalid_pairs, np.full(self.num_objects, False))
+                    )
+                else:
+                    X = cp.Variable((n_links, self.num_objects), integer=True)
 
-            # CVXPY Objective Function
-            objective = cp.Maximize(cp.sum(cp.multiply(X, V_matrix - V_neighbors)))
+                # CVXPY Objective Function
+                objective = cp.Maximize(cp.sum(cp.multiply(X, V_matrix - V_neighbors)))
+                # CVXPY Constraints
+                constraints = [
+                    cp.sum(X, axis=1) <= link_caps,  # Link capacity constraints
+                    cp.sum(X, axis=0) <= V,  # VIP count constraints
+                    X >= 0,  # Resource allocations are non-negative
+                ]
+                if invalid_pairs.any():
+                    constraints.append(X[invalid_pairs] == 0)
+                # CVXPY Problem
+                prob = cp.Problem(objective, constraints)
+                # Solve the Problem
+                prob.solve()
+                X = X.value
+                X[abs(X) < 1e-6] = 0
 
-            # CVXPY Constraints
-            constraints = [
-                cp.sum(X, axis=1) <= link_caps,  # Link capacity constraints
-                cp.sum(X, axis=0) <= V,  # VIP count constraints
-                X >= 0,  # Resource allocations are non-negative
-                X[invalid_pairs] == 0,  # Invalid pairs are not allocated
-            ]
-
-            # CVXPY Problem
-            prob = cp.Problem(objective, constraints)
-
-            # Solve the Problem
-            prob.solve()
-
-            X[np.abs(X.value) < 1e-6] = 0
             fwd_vips = {}
             for i, remote_id in enumerate(self.fib_inv):
                 fwd_vips[remote_id] = {}
                 for k in self.fib_inv[remote_id]:
-                    fwd_vips[remote_id][k] = X.value[i, k]
-                    self.vip_counts[k] -= X.value[i, k]
+                    fwd_vips[remote_id][k] = X[i, k]
+                    self.vip_counts[k] -= X[i, k]
                     if self.vip_counts[k] < 0:
                         raise ValueError("Negative VIP count")
 
-            for k in self.cacheable_objects:
-                self.vip_cache_tx_windows[k].append(X.value[-1, k])
-                self.vip_counts[k] -= X.value[-1, k]
-                if self.vip_counts[k] < 0:
-                    raise ValueError("Negative VIP count")
+            if self.has_caches:
+                for k in self.cacheable_objects:
+                    self.vip_cache_tx_windows[k].append(X[-1, k])
+                    self.vip_counts[k] -= X[-1, k]
+                    if self.vip_counts[k] < 0:
+                        raise ValueError("Negative VIP count")
 
             # Send VIPs
             for remote_id in self.ctrl_out_links:
