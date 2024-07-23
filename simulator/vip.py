@@ -328,11 +328,18 @@ class VIPSBWNode(VIP2Node):
                     self.vip_counts[k_star] - cache_decrement, 0
                 )
 
+
 class VIPSBW2Node(VIPNode):
+    def addCache(self, cache):
+        super().addCache(cache)
+        self.vip_cache_tx_windows = {}
+        for object_id in self.cacheable_objects:
+            self.vip_cache_tx_windows[object_id] = wique(maxlen=self.win_size)
+
     def updateVipCacheScores(self):
         for k in self.cacheable_objects:
             self.cache_scores[k] = self.vip_rx_windows[k].mean
-    
+
     def vipProcess(self):
         while True:
             # Set VIP counts to 0 for all sourced objects
@@ -350,12 +357,22 @@ class VIPSBW2Node(VIPNode):
                     remote_id
                 ].getUpdate()
 
-            n_links = len(self.ctrl_in_links)
+            n_links = len(self.fib_inv)
             V = np.array(self.vip_counts)
             V_matrix = np.tile(V, (n_links, 1))
-            V_neighbors = np.array([self.neighbor_vip_counts[remote_id] for remote_id in self.ctrl_in_links])
-            link_caps = np.array([self.slot_len * self.out_links[remote_id].link_cap for remote_id in self.out_links])
-            
+            V_neighbors = np.array(
+                [
+                    self.neighbor_vip_counts[remote_id]
+                    for remote_id in self.fib_inv
+                ]
+            )
+            link_caps = np.array(
+                [
+                    self.slot_len * self.in_links[remote_id].link_cap
+                    for remote_id in self.fib_inv
+                ]
+            )
+
             invalid_pairs = np.full((n_links, self.num_objects), True)
             for remote_id in self.fib_inv:
                 for k in self.fib_inv[remote_id]:
@@ -364,25 +381,28 @@ class VIPSBW2Node(VIPNode):
             if self.has_caches:
                 V_matrix = np.vstack((V_matrix, V))
                 V_neighbors = np.vstack((V_neighbors, np.zeros(self.num_objects)))
-                link_caps = np.append(link_caps, self.slot_len * self.caches[0].read_rate)
-            
+                link_caps = np.append(
+                    link_caps, self.slot_len * self.caches[0].read_rate
+                )
+
             # CVXPY Variables
             if self.has_caches:
-                X = cp.Variable((n_links+1, self.num_objects))  # Resource allocations
-                invalid_pairs = np.vstack((invalid_pairs, np.full(self.num_objects, False)))
+                X = cp.Variable((n_links + 1, self.num_objects), integer=True)  # Resource allocations
+                invalid_pairs = np.vstack(
+                    (invalid_pairs, np.full(self.num_objects, False))
+                )
             else:
-                X = cp.Variable((n_links, self.num_objects))
-            
+                X = cp.Variable((n_links, self.num_objects), integer=True)
 
             # CVXPY Objective Function
             objective = cp.Maximize(cp.sum(cp.multiply(X, V_matrix - V_neighbors)))
 
             # CVXPY Constraints
             constraints = [
-                cp.sum(X, axis=1) <= C,  # Link capacity constraints
-                cp.sum(X, axis=0) <= V,  # VIP score constraints
+                cp.sum(X, axis=1) <= link_caps,  # Link capacity constraints
+                cp.sum(X, axis=0) <= V,  # VIP count constraints
                 X >= 0,  # Resource allocations are non-negative
-                X[invalid_pairs] == 0  # Invalid pairs are not allocated
+                X[invalid_pairs] == 0,  # Invalid pairs are not allocated
             ]
 
             # CVXPY Problem
@@ -391,6 +411,48 @@ class VIPSBW2Node(VIPNode):
             # Solve the Problem
             prob.solve()
 
+            X[np.abs(X.value) < 1e-6] = 0
+            fwd_vips = {}
+            for i, remote_id in enumerate(self.fib_inv):
+                fwd_vips[remote_id] = {}
+                for k in self.fib_inv[remote_id]:
+                    fwd_vips[remote_id][k] = X.value[i, k]
+                    self.vip_counts[k] -= X.value[i, k]
+                    if self.vip_counts[k] < 0:
+                        raise ValueError("Negative VIP count")
+
+            for k in self.cacheable_objects:
+                self.vip_cache_tx_windows[k].append(X.value[-1, k])
+                self.vip_counts[k] -= X.value[-1, k]
+                if self.vip_counts[k] < 0:
+                    raise ValueError("Negative VIP count")
+
+            # Send VIPs
+            for remote_id in self.ctrl_out_links:
+                if remote_id in fwd_vips:
+                    self.ctrl_out_links[remote_id].pushVips(fwd_vips[remote_id])
+                    for object_id in self.fib_inv[remote_id]:
+                        # Record TX VIP stats
+                        self.neighbor_vip_tx[remote_id, object_id].append(
+                            fwd_vips[remote_id][object_id]
+                        )
+                else:
+                    self.ctrl_out_links[remote_id].pushVips({})
+
+            # Wait for slot length duration and increment VIP counts due to
+            # exogenous arrivals
+            yield self.env.timeout(self.slot_len)
+
+            # Receive VIPs from neighbors, increment VIP counts accordingly and
+            # update VIP RX windows
+            for remote_id in self.ctrl_in_links:
+                rx_vips = yield self.ctrl_in_links[remote_id].getVips()
+                for object_id in rx_vips:
+                    self.vip_counts[object_id] += rx_vips[object_id]
+                    self.vip_rx[object_id] += rx_vips[object_id]
+            for k in range(self.num_objects):
+                self.vip_rx_windows[k].append(self.vip_rx[k])
+                self.vip_rx[k] = 0
 
 class VIPSBW3Node(VIP2Node):
     def vipForwarding(self):
@@ -585,6 +647,7 @@ class MVIPSBWNode(MVIPNode):
                     self.vip_counts[k] - self.vip_cache_tx_windows[j, k][-1]
                 )
 
+
 class MVIPSBW2Node(MVIPSBWNode):
     def decideCaching(self, object_id):
         tier_avgs = [
@@ -593,7 +656,9 @@ class MVIPSBW2Node(MVIPSBWNode):
         ]
         j_star = np.argmax(tier_avgs)
         valid_links = [remote_id for remote_id in self.fib[object_id]]
-        link_avgs = [self.neighbor_vip_tx[remote_id, object_id].mean for remote_id in valid_links]
+        link_avgs = [
+            self.neighbor_vip_tx[remote_id, object_id].mean for remote_id in valid_links
+        ]
         if tier_avgs[j_star] > max(link_avgs):
             cache = self.caches[j_star]
             if cache.isFull():
@@ -603,14 +668,16 @@ class MVIPSBW2Node(MVIPSBWNode):
                     self.env.process(self.decideCaching(victim_id))
             else:
                 cache.cacheObject(object_id)
-    
+
     def vipCaching(self):
         # Obtain object ids for sorted scores
         sorted_cache_scores_idx = np.flip(np.argsort(self.cache_scores))
         sorted_cache_scores_idx = [
-            k for k in sorted_cache_scores_idx if k in self.cacheable_objects and self.cache_scores[k] > 0
+            k
+            for k in sorted_cache_scores_idx
+            if k in self.cacheable_objects and self.cache_scores[k] > 0
         ]
-        allocs = {j:defaultdict(int) for j in range(len(self.caches))}
+        allocs = {j: defaultdict(int) for j in range(len(self.caches))}
         for j, cache in enumerate(self.caches):
             bw = self.slot_len * cache.read_rate
             cap = cache.capacity
@@ -627,7 +694,7 @@ class MVIPSBW2Node(MVIPSBWNode):
         for j in range(len(self.caches)):
             for k in self.cacheable_objects:
                 self.vip_cache_tx_windows[j, k].append(allocs[j][k])
-    
+
     def vipForwarding(self):
         fwd_vips = {}
         vip_diffs = []
@@ -637,7 +704,7 @@ class MVIPSBW2Node(MVIPSBWNode):
                 vip_diff = self.vip_counts[k] - self.neighbor_vip_counts[b][k]
                 vip_diffs.append((vip_diff, b, k))
         vip_diffs.sort(reverse=True)
-        
+
         link_bws = {b: self.slot_len * self.out_links[b].link_cap for b in self.fib_inv}
         for vip_diff, b, k in vip_diffs:
             if vip_diff <= 0:
@@ -651,7 +718,7 @@ class MVIPSBW2Node(MVIPSBWNode):
                 self.vip_counts[k] -= alloc
 
         return fwd_vips
-    
+
     def vipProcess(self):
         # avg_cpu_time, cpu_counter = 0, 0
         while True:
