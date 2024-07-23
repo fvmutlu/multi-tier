@@ -1,5 +1,6 @@
 # External package imports
 import numpy as np
+import cvxpy as cp
 from scipy.optimize import linear_sum_assignment
 import time
 
@@ -327,8 +328,71 @@ class VIPSBWNode(VIP2Node):
                     self.vip_counts[k_star] - cache_decrement, 0
                 )
 
+class VIPSBW2Node(VIPNode):
+    def updateVipCacheScores(self):
+        for k in self.cacheable_objects:
+            self.cache_scores[k] = self.vip_rx_windows[k].mean
+    
+    def vipProcess(self):
+        while True:
+            # Set VIP counts to 0 for all sourced objects
+            if self.is_source:
+                for k in self.permastore.contents:
+                    self.vip_counts[k] = 0
 
-class VIPSBW2Node(VIP2Node):
+            # Update neighbors' information with local node's VIP counts
+            for remote_id in self.ctrl_out_links:
+                self.ctrl_out_links[remote_id].pushUpdate(self.vip_counts)
+
+            # Update local node's VIP information with neighbors' VIP counts
+            for remote_id in self.ctrl_in_links:
+                self.neighbor_vip_counts[remote_id] = yield self.ctrl_in_links[
+                    remote_id
+                ].getUpdate()
+
+            n_links = len(self.ctrl_in_links)
+            V = np.array(self.vip_counts)
+            V_matrix = np.tile(V, (n_links, 1))
+            V_neighbors = np.array([self.neighbor_vip_counts[remote_id] for remote_id in self.ctrl_in_links])
+            link_caps = np.array([self.slot_len * self.out_links[remote_id].link_cap for remote_id in self.out_links])
+            
+            invalid_pairs = np.full((n_links, self.num_objects), True)
+            for remote_id in self.fib_inv:
+                for k in self.fib_inv[remote_id]:
+                    invalid_pairs[remote_id, k] = False
+
+            if self.has_caches:
+                V_matrix = np.vstack((V_matrix, V))
+                V_neighbors = np.vstack((V_neighbors, np.zeros(self.num_objects)))
+                link_caps = np.append(link_caps, self.slot_len * self.caches[0].read_rate)
+            
+            # CVXPY Variables
+            if self.has_caches:
+                X = cp.Variable((n_links+1, self.num_objects))  # Resource allocations
+                invalid_pairs = np.vstack((invalid_pairs, np.full(self.num_objects, False)))
+            else:
+                X = cp.Variable((n_links, self.num_objects))
+            
+
+            # CVXPY Objective Function
+            objective = cp.Maximize(cp.sum(cp.multiply(X, V_matrix - V_neighbors)))
+
+            # CVXPY Constraints
+            constraints = [
+                cp.sum(X, axis=1) <= C,  # Link capacity constraints
+                cp.sum(X, axis=0) <= V,  # VIP score constraints
+                X >= 0,  # Resource allocations are non-negative
+                X[invalid_pairs] == 0  # Invalid pairs are not allocated
+            ]
+
+            # CVXPY Problem
+            prob = cp.Problem(objective, constraints)
+
+            # Solve the Problem
+            prob.solve()
+
+
+class VIPSBW3Node(VIP2Node):
     def vipForwarding(self):
         vip_allocs = defaultdict(list)
 
@@ -536,7 +600,7 @@ class MVIPSBW2Node(MVIPSBWNode):
                 victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
                 if self.cache_scores[object_id] > self.cache_scores[victim_id]:
                     yield self.env.process(cache.replaceObject(victim_id, object_id))
-                    object_id = victim_id
+                    self.env.process(self.decideCaching(victim_id))
             else:
                 cache.cacheObject(object_id)
     
