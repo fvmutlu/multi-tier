@@ -790,13 +790,17 @@ class MVIPSBWNode(MVIPNode):
             for j in range(len(self.caches))
         ]
         j_star = np.argmax(tier_avgs)
-        if tier_avgs[j_star] > 0:
+        valid_links = [remote_id for remote_id in self.fib[object_id]]
+        link_avgs = [
+            self.neighbor_vip_tx[remote_id, object_id].mean for remote_id in valid_links
+        ]
+        if tier_avgs[j_star] > max(link_avgs):
             cache = self.caches[j_star]
             if cache.isFull():
                 victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
                 if self.cache_scores[object_id] > self.cache_scores[victim_id]:
                     yield self.env.process(cache.replaceObject(victim_id, object_id))
-                    object_id = victim_id
+                    self.env.process(self.decideCaching(victim_id))
             else:
                 cache.cacheObject(object_id)
 
@@ -834,26 +838,6 @@ class MVIPSBWNode(MVIPNode):
 
 
 class MVIPSBW2Node(MVIPSBWNode):
-    def decideCaching(self, object_id):
-        tier_avgs = [
-            self.vip_cache_tx_windows[j, object_id].mean
-            for j in range(len(self.caches))
-        ]
-        j_star = np.argmax(tier_avgs)
-        valid_links = [remote_id for remote_id in self.fib[object_id]]
-        link_avgs = [
-            self.neighbor_vip_tx[remote_id, object_id].mean for remote_id in valid_links
-        ]
-        if tier_avgs[j_star] > max(link_avgs):
-            cache = self.caches[j_star]
-            if cache.isFull():
-                victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
-                if self.cache_scores[object_id] > self.cache_scores[victim_id]:
-                    yield self.env.process(cache.replaceObject(victim_id, object_id))
-                    self.env.process(self.decideCaching(victim_id))
-            else:
-                cache.cacheObject(object_id)
-
     def vipCaching(self):
         # Obtain object ids for sorted scores
         sorted_cache_scores_idx = np.flip(np.argsort(self.cache_scores))
@@ -973,10 +957,10 @@ class MVIPSBW2Node(MVIPSBWNode):
                 self.vip_rx[k] = 0
 
             # Update VIP stats
-            # self.stats["vip_count_sum"].append(sum(self.vip_counts))
-            # self.stats["pit_count_sum"].append(sum([len(q) for q in self.pit.values()]))
-            """ if self.has_caches:
+            self.stats["vip_count_sum"].append(sum(self.vip_counts))
+            self.stats["pit_count_sum"].append(sum([len(q) for q in self.pit.values()]))
+            if self.has_caches:
                 for j, cache in enumerate(self.caches):
                     self.stats["vip_rx_avg_in_cache"][j].append(
                         sum([self.vip_rx_windows[k].mean for k in cache.contents])
-                    ) """
+                    )
