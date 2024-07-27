@@ -4,7 +4,7 @@
     "num_objects"            : [2000],
     "source_read_rate"       : [1000],
     "source_map_seed"        : [1],
-    "request_generator_seed" : [1],
+    "request_generator_seed" : [3],
     "stop_time"              : [100],
     "request_rate"           : [15],
     "request_dist_param"     : [0.75],
