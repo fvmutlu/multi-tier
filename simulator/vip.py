@@ -44,9 +44,12 @@ class VIPNode(Node):
         # Additional stats relating to VIP
         self.stats["vip_count_sum"] = []
         self.stats["pit_count_sum"] = []
+        self.stats["vip_pit_norm"] = []
+        self.stats["neighbor_vip_tx"] = {}
+        self.stats["cache_vip_tx"] = []
         # self.stats["vip_caching_avg_time"] = 0
-        self.stats["vip_rx_avg_in_cache"] = []
-        self.stats["vip_tx_ties"] = 0
+        # self.stats["vip_rx_avg_in_cache"] = []
+        # self.stats["vip_tx_ties"] = 0
 
         # Init VIP process
         self.env.process(self.vipProcess())
@@ -59,6 +62,7 @@ class VIPNode(Node):
         super().addOutputLink(remote_id, link, ctrl_link)
         self.link_delays[remote_id] = wique(maxlen=1)
         self.req_timestamps[remote_id] = {}
+        self.stats["neighbor_vip_tx"][remote_id] = 0
 
     def packetProcessor(self):
         while True:
@@ -80,7 +84,8 @@ class VIPNode(Node):
             )
         super().addCache(cache)
         self.virtual_caches.append(set())
-        self.stats["vip_rx_avg_in_cache"].append([])
+        self.stats["cache_vip_tx"].append(0)
+        #self.stats["vip_rx_avg_in_cache"].append([])
 
     def addPermastore(self, permastore):
         super().addPermastore(permastore)
@@ -115,8 +120,8 @@ class VIPNode(Node):
             [self.link_delays[remote_id].mean for remote_id in neighbors]
         )
         max_profit_link_idx = np.where(link_profits == link_profits.max())[0]
-        if len(max_profit_link_idx) > 1:
-            self.stats["vip_tx_ties"] += 1
+        #if len(max_profit_link_idx) > 1:
+        #    self.stats["vip_tx_ties"] += 1
         max_profit_link_delays = np.array(
             [link_delays[idx] for idx in max_profit_link_idx]
         )
@@ -200,6 +205,9 @@ class VIPNode(Node):
         for j, cache in enumerate(self.caches):
             cache_decrement = self.slot_len * cache.read_rate / cache.capacity
             for k in self.virtual_caches[j]:
+                self.stats["cache_vip_tx"][j] += min(
+                    self.vip_counts[k], cache_decrement
+                )
                 self.vip_counts[k] = max(self.vip_counts[k] - cache_decrement, 0)
 
     def vipProcess(self):
@@ -258,6 +266,7 @@ class VIPNode(Node):
                         self.neighbor_vip_tx[remote_id, object_id].append(
                             fwd_vips[remote_id][object_id]
                         )
+                        self.stats["neighbor_vip_tx"][remote_id] += fwd_vips[remote_id][object_id]
                 else:
                     self.ctrl_out_links[remote_id].pushVips({})
 
@@ -282,13 +291,16 @@ class VIPNode(Node):
                 self.vip_rx[k] = 0
 
             # Update VIP stats
-            self.stats["vip_count_sum"].append(sum(self.vip_counts))
-            self.stats["pit_count_sum"].append(sum([len(q) for q in self.pit.values()]))
-            if self.has_caches:
+            vips = np.array([self.vip_counts[k] for k in range(self.num_objects)])
+            pits = np.array([len(self.pit[k]) for k in range(self.num_objects)])
+            self.stats["vip_count_sum"].append(vips.sum())
+            self.stats["pit_count_sum"].append(pits.sum())
+            self.stats["vip_pit_norm"].append(np.linalg.norm(vips-pits))
+            """ if self.has_caches:
                 for j, cache in enumerate(self.caches):
                     self.stats["vip_rx_avg_in_cache"][j].append(
                         sum([self.vip_rx_windows[k].mean for k in cache.contents])
-                    )
+                    ) """
 
 
 class VIP2Node(VIPNode):
@@ -478,13 +490,16 @@ class VIPSBW2Node(VIP2Node):
                 self.vip_rx[k] = 0
 
             # Update VIP stats
-            self.stats["vip_count_sum"].append(sum(self.vip_counts))
-            self.stats["pit_count_sum"].append(sum([len(q) for q in self.pit.values()]))
-            if self.has_caches:
+            vips = np.array([self.vip_counts[k] for k in range(self.num_objects)])
+            pits = np.array([len(self.pit[k]) for k in range(self.num_objects)])
+            self.stats["vip_count_sum"].append(vips.sum())
+            self.stats["pit_count_sum"].append(pits.sum())
+            self.stats["vip_pit_norm"].append(np.linalg.norm(vips-pits))
+            """ if self.has_caches:
                 for j, cache in enumerate(self.caches):
                     self.stats["vip_rx_avg_in_cache"][j].append(
                         sum([self.vip_rx_windows[k].mean for k in cache.contents])
-                    )
+                    ) """
 
 class VIPSBW3Node(VIPNode):
     def addCache(self, cache):
@@ -630,16 +645,19 @@ class VIPSBW3Node(VIPNode):
                 self.vip_rx[k] = 0
 
             # Update VIP stats
-            self.stats["vip_count_sum"].append(sum(self.vip_counts))
-            self.stats["pit_count_sum"].append(sum([len(q) for q in self.pit.values()]))
-            if self.has_caches:
+            vips = np.array([self.vip_counts[k] for k in range(self.num_objects)])
+            pits = np.array([len(self.pit[k]) for k in range(self.num_objects)])
+            self.stats["vip_count_sum"].append(vips.sum())
+            self.stats["pit_count_sum"].append(pits.sum())
+            self.stats["vip_pit_norm"].append(np.linalg.norm(vips-pits))
+            """ if self.has_caches:
                 for j, cache in enumerate(self.caches):
                     self.stats["vip_rx_avg_in_cache"][j].append(
                         sum([self.vip_rx_windows[k].mean for k in cache.contents])
-                    )
+                    ) """
 
 
-class VIPSBW3Node(VIP2Node):
+class VIPSBW4Node(VIP2Node):
     def vipForwarding(self):
         vip_allocs = defaultdict(list)
 
@@ -685,7 +703,8 @@ class MVIPNode(VIPNode):
     def addCache(self, cache):
         Node.addCache(self, cache)
         self.virtual_caches.append(set())
-        self.stats["vip_rx_avg_in_cache"].append([])
+        self.stats["cache_vip_tx"].append(0)
+        #self.stats["vip_rx_avg_in_cache"].append([])
         self.tier_mapping += [len(self.caches) - 1] * cache.capacity
         if self.tier_slices:
             end_of_last_slice = self.tier_slices[-1].stop
@@ -771,7 +790,6 @@ class MVIPNode(VIPNode):
                 self.virtual_caches[self.tier_mapping[i]].add(k)
                 self.virtual_object_locs[k] = self.tier_mapping[i]
 
-
 class MVIPSBWNode(MVIPNode):
     def __init__(self, env, node_id, num_objects, pen_weight, **vip_args):
         super().__init__(env, node_id, num_objects, pen_weight, **vip_args)
@@ -794,7 +812,7 @@ class MVIPSBWNode(MVIPNode):
         link_avgs = [
             self.neighbor_vip_tx[remote_id, object_id].mean for remote_id in valid_links
         ]
-        if tier_avgs[j_star] > max(link_avgs):
+        if tier_avgs[j_star] >= max(link_avgs):
             cache = self.caches[j_star]
             if cache.isFull():
                 victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
@@ -835,6 +853,7 @@ class MVIPSBWNode(MVIPNode):
                 self.vip_counts[k] = (
                     self.vip_counts[k] - self.vip_cache_tx_windows[j, k][-1]
                 )
+                self.stats["cache_vip_tx"][j] += self.vip_cache_tx_windows[j, k][-1]
 
 
 class MVIPSBW2Node(MVIPSBWNode):
@@ -933,6 +952,7 @@ class MVIPSBW2Node(MVIPSBWNode):
                         self.neighbor_vip_tx[remote_id, object_id].append(
                             fwd_vips[remote_id][object_id]
                         )
+                        self.stats["neighbor_vip_tx"][remote_id] += fwd_vips[remote_id][object_id]
                 else:
                     self.ctrl_out_links[remote_id].pushVips({})
 
@@ -957,10 +977,13 @@ class MVIPSBW2Node(MVIPSBWNode):
                 self.vip_rx[k] = 0
 
             # Update VIP stats
-            self.stats["vip_count_sum"].append(sum(self.vip_counts))
-            self.stats["pit_count_sum"].append(sum([len(q) for q in self.pit.values()]))
-            if self.has_caches:
+            vips = np.array([self.vip_counts[k] for k in range(self.num_objects)])
+            pits = np.array([len(self.pit[k]) for k in range(self.num_objects)])
+            self.stats["vip_count_sum"].append(vips.sum())
+            self.stats["pit_count_sum"].append(pits.sum())
+            self.stats["vip_pit_norm"].append(np.linalg.norm(vips-pits))
+            """ if self.has_caches:
                 for j, cache in enumerate(self.caches):
                     self.stats["vip_rx_avg_in_cache"][j].append(
                         sum([self.vip_rx_windows[k].mean for k in cache.contents])
-                    )
+                    ) """
