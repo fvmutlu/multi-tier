@@ -13,6 +13,7 @@ from urllib.request import urlopen
 from simulator.helpers import SimulationParameters, simConfigToParamSets
 from simulator.topologies import topologies, getRandomTopology
 
+
 def dictsToParamSets(param_dicts: List[dict]) -> List[SimulationParameters]:
     for param_set in param_dicts:
         param_set["cache_capacities"] = tuple(param_set["cache_capacities"])
@@ -61,11 +62,15 @@ def filterParamList(
         else:
             if isinstance(filter_value, list):
                 param_list = [
-                    params for params in param_list if params[filter_key] in filter_value
+                    params
+                    for params in param_list
+                    if params[filter_key] in filter_value
                 ]
             else:
                 param_list = [
-                    params for params in param_list if params[filter_key] == filter_value
+                    params
+                    for params in param_list
+                    if params[filter_key] == filter_value
                 ]
     return param_list
 
@@ -74,32 +79,43 @@ def getParamHashList(param_list: List[SimulationParameters]):
     return [str(hash(sp)) for sp in param_list]
 
 
-def singleEntrySumDataFieldAcrossNodes(top_name: str, db_entry: dict, field: str):
-    if "num_nodes" in topologies[top_name].keys():
-        num_nodes = topologies[top_name]["num_nodes"]
-    elif "num_nodes" in topologies[top_name]["top_args"].keys():
-        num_nodes = topologies[top_name]["top_args"]["num_nodes"]
-    else:
-        tmp_G = getRandomTopology(top_name, **topologies[top_name]["top_args"])
-        num_nodes = len(tmp_G.nodes)
-    if isinstance(db_entry["data"]["0"][field], (int, float)):
-        return sum([db_entry["data"][str(node)][field] for node in range(num_nodes)])
-    elif isinstance(db_entry["data"]["0"][field], (list, tuple)):
+def singleEntrySumDataFieldAcrossNodes(
+    top_name: str, db_entry: dict, field: str, nodes: List[int] = None
+):
+    if not nodes:
+        if "num_nodes" in topologies[top_name].keys():
+            num_nodes = topologies[top_name]["num_nodes"]
+        elif "num_nodes" in topologies[top_name]["top_args"].keys():
+            num_nodes = topologies[top_name]["top_args"]["num_nodes"]
+        else:
+            tmp_G = getRandomTopology(top_name, **topologies[top_name]["top_args"])
+            num_nodes = len(tmp_G.nodes)
+        nodes = list(range(num_nodes))
+    if isinstance(db_entry["data"][str(nodes[0])][field], (int, float)):
+        return sum([db_entry["data"][str(node)][field] for node in nodes])
+    elif isinstance(db_entry["data"][str(nodes[0])][field], (list, tuple)):
         return np.sum(
-            [db_entry["data"][str(node)][field] for node in range(num_nodes)],
+            [db_entry["data"][str(node)][field] for node in nodes],
             axis=0,
         )
 
 
 def getDataFieldSumsAcrossEntries(
-    top_name: str, db: dict, entry_hashes: List[str], field: str
+    top_name: str,
+    db: dict,
+    entry_hashes: List[str],
+    field: str,
+    nodes: List[int] = None,
 ):
-    return np.array(
-        [
-            singleEntrySumDataFieldAcrossNodes(top_name, db[hash], field)
-            for hash in entry_hashes
-        ]
-    )
+    entry_results = [
+        singleEntrySumDataFieldAcrossNodes(top_name, db[hash], field, nodes)
+        for hash in entry_hashes
+    ]
+    if field in ["vip_count_sum", "pit_count_sum", "vip_pit_norm"]:
+        min_length = min([len(entry) for entry in entry_results])
+        return np.array([entry[:min_length] for entry in entry_results])
+    else:
+        return np.array(entry_results)
 
 
 def getDataFieldSumAvgsAcrossSeeds(
@@ -109,6 +125,7 @@ def getDataFieldSumAvgsAcrossSeeds(
     source_map_seeds: List[int],
     request_generator_seeds: List[int],
     field: str,
+    nodes: List[int] = None,
 ):
     num_runs = len(source_map_seeds) * len(request_generator_seeds)
     accumulator = None
@@ -122,16 +139,20 @@ def getDataFieldSumAvgsAcrossSeeds(
             run_param_hashes = getParamHashList(run_param_list)
             if accumulator is None:
                 accumulator = getDataFieldSumsAcrossEntries(
-                    top_name, db, run_param_hashes, field
+                    top_name, db, run_param_hashes, field, nodes
                 )
             else:
-                accumulator = np.add(
-                    accumulator,
-                    getDataFieldSumsAcrossEntries(
-                        top_name, db, run_param_hashes, field
-                    ),
+                run_data = getDataFieldSumsAcrossEntries(
+                    top_name, db, run_param_hashes, field, nodes
                 )
-        
+                if field in ["vip_count_sum", "pit_count_sum", "vip_pit_norm"]:
+                    min_length = min(run_data.shape[1], accumulator.shape[1])
+                    accumulator = np.add(
+                        accumulator[:, :min_length], run_data[:, :min_length]
+                    )
+                else:
+                    accumulator = np.add(accumulator, run_data)
+
     return accumulator / num_runs
 
 
