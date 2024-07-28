@@ -757,8 +757,8 @@ class MVIPNode(VIPNode):
             # Update cache score
             # self.cache_scores[k] = self.vip_rx_windows[k].mean
             # The cs_k values act as temp scores for MVIP
-            #cs_k = self.cache_scores[k]
-            cs_k = self.vip_counts[k]
+            cs_k = self.cache_scores[k]
+            #cs_k = self.vip_counts[k]
             for j, cache in enumerate(self.caches):
                 tier_slice = self.tier_slices[j]
                 if object_loc == j:
@@ -829,15 +829,15 @@ class MVIPSBWNode(MVIPNode):
 
     def vipCaching(self):
         # Obtain object ids for sorted scores
-        #sorted_cache_scores_idx = np.flip(np.argsort(self.cache_scores))
-        sorted_cache_scores_idx = np.flip(np.argsort(self.vip_counts))
+        sorted_cache_scores_idx = np.flip(np.argsort(self.cache_scores))
+        #sorted_cache_scores_idx = np.flip(np.argsort(self.vip_counts))
         sorted_cache_scores_idx = [
             k for k in sorted_cache_scores_idx if k in self.cacheable_objects
         ]
         done_pairs = []
         for j, k in enumerate(sorted_cache_scores_idx[: len(self.caches)]):
-            #if self.cache_scores[k] > 0:
-            if self.vip_counts[k] > 0:
+            if self.cache_scores[k] > 0:
+            #if self.vip_counts[k] > 0:
                 self.vip_cache_tx_windows[j, k].append(
                     self.slot_len * self.caches[j].read_rate
                 )
@@ -862,13 +862,13 @@ class MVIPSBWNode(MVIPNode):
 class MVIPSBW2Node(MVIPSBWNode):
     def vipCaching(self):
         # Obtain object ids for sorted scores
-        #sorted_cache_scores_idx = np.flip(np.argsort(self.cache_scores))
-        sorted_cache_scores_idx = np.flip(np.argsort(self.vip_counts))
+        sorted_cache_scores_idx = np.flip(np.argsort(self.cache_scores))
+        #sorted_cache_scores_idx = np.flip(np.argsort(self.vip_counts))
         sorted_cache_scores_idx = [
             k
             for k in sorted_cache_scores_idx
-            if k in self.cacheable_objects and self.vip_counts[k] > 0
-            #if k in self.cacheable_objects and self.cache_scores[k] > 0
+            #if k in self.cacheable_objects and self.vip_counts[k] > 0
+            if k in self.cacheable_objects and self.cache_scores[k] > 0
         ]
         allocs = {j: defaultdict(int) for j in range(len(self.caches))}
         for j, cache in enumerate(self.caches):
