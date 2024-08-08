@@ -20,7 +20,7 @@ on:
             type: string
             default: 'abilene'
         config_url:
-            description: 'URL that directs to raw JSON for experiment config'
+            description: 'URL to JSON experiment config'
             required: true
             type: string
         x_label:
@@ -32,7 +32,7 @@ on:
             required: false
             type: string
         curve_label:
-            description: '(Optional) Parameter to iterate different curves on the output plot'
+            description: 'Parameter to iterate different curves on the output plot'
             required: false
             type: string
             default: ''
