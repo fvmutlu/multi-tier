@@ -5,6 +5,7 @@ import time
 
 # Builtin imports
 from collections import defaultdict
+from copy import copy
 
 # Internal imports
 from .caching_policies import *
@@ -196,7 +197,7 @@ class VIPNode(Node):
                 self.vip_counts[k] = max(self.vip_counts[k] - cache_decrement, 0)
 
     def vipProcess(self):
-        #avg_cpu_time, cpu_counter = 0, 0
+        # avg_cpu_time, cpu_counter = 0, 0
         while True:
             # Set VIP counts to 0 for all sourced objects
             if self.is_source:
@@ -216,7 +217,7 @@ class VIPNode(Node):
             # Determine virtual plane forwarding
             vip_allocs = self.vipForwarding()
 
-            #tic = time.perf_counter()
+            # tic = time.perf_counter()
             if self.has_caches:
                 # Update cache scores for use outside virtual plane (this can be different for variants)
                 self.updateVipCacheScores()
@@ -224,9 +225,9 @@ class VIPNode(Node):
                 self.vipCaching()
                 # Decrement VIP counts due to caching
                 self.drainVipsByCaching()
-            #toc = time.perf_counter()
-            #avg_cpu_time, cpu_counter = (avg_cpu_time * cpu_counter + (toc - tic)) / (cpu_counter + 1), cpu_counter + 1
-            #self.stats["vip_caching_avg_time"] = avg_cpu_time
+            # toc = time.perf_counter()
+            # avg_cpu_time, cpu_counter = (avg_cpu_time * cpu_counter + (toc - tic)) / (cpu_counter + 1), cpu_counter + 1
+            # self.stats["vip_caching_avg_time"] = avg_cpu_time
 
             # Determine actual amount of VIPs that will be forwarded
             fwd_vips = {}
@@ -316,6 +317,8 @@ class MVIPNode(VIPNode):
         super().__init__(env, node_id, num_objects, pen_weight, **vip_args)
         self.virtual_object_locs = {key: -2 for key in range(num_objects)}
         self.tier_mapping, self.tier_slices = [], []
+        self.stats["vp_admissions"] = []
+        self.stats["vp_evictions"] = []
 
     def addCache(self, cache):
         Node.addCache(self, cache)
@@ -327,6 +330,8 @@ class MVIPNode(VIPNode):
         else:
             new_slice = slice(0, cache.capacity)
         self.tier_slices.append(new_slice)
+        self.stats["vp_admissions"].append(0)
+        self.stats["vp_evictions"].append(0)
 
     def decideCaching(self, object_id):
         benefits = []
@@ -391,8 +396,8 @@ class MVIPNode(VIPNode):
         row_ind, col_ind = linear_sum_assignment(cost_matrix, maximize=True)
 
         # Clear virtual caches
-        for v_cache in self.virtual_caches:
-            v_cache.clear()
+        # for v_cache in self.virtual_caches:
+        #    v_cache.clear()
 
         # Reset virtual object locs
         self.virtual_object_locs = resetDict(
@@ -400,7 +405,57 @@ class MVIPNode(VIPNode):
         )
 
         # Assign objects to virtual cache
+        v_caches = [set() for _ in range(len(self.caches))]
         for i, k in zip(row_ind, col_ind):
             if cost_matrix[i][k] >= 0 and k in self.cacheable_objects:
-                self.virtual_caches[self.tier_mapping[i]].add(k)
+                # self.virtual_caches[self.tier_mapping[i]].add(k)
+                v_caches[self.tier_mapping[i]].add(k)
                 self.virtual_object_locs[k] = self.tier_mapping[i]
+        for j, v_cache in enumerate(v_caches):
+            self.stats["vp_admissions"][j] += len(v_cache - self.virtual_caches[j])
+            self.stats["vp_evictions"][j] += len(self.virtual_caches[j] - v_cache)
+            self.virtual_caches[j] = copy(v_cache)
+
+
+# No virtual plane penalties, only data plane penalties
+class MVIP1Node(MVIPNode):
+    def vipCaching(self):
+        sorted_by_cache_scores = sorted(
+            list(range(self.num_objects)),
+            key=lambda k: self.cache_scores[k],
+            reverse=True,
+        )
+
+        # Reset virtual object locs
+        self.virtual_object_locs = resetDict(
+            self.virtual_object_locs, -2, keys=self.cacheable_objects
+        )
+
+        # Assign objects to virtual caches
+        v_caches = [set() for _ in range(len(self.caches))]
+        i = 0
+        for j, cache in enumerate(self.caches):
+            while i < self.num_objects and len(v_caches[j]) < cache.capacity:
+                k = sorted_by_cache_scores[i]
+                if k in self.cacheable_objects:
+                    v_caches[j].add(k)
+                    self.virtual_object_locs[k] = j
+                i += 1
+
+        for j, v_cache in enumerate(v_caches):
+            self.stats["vp_admissions"][j] += len(v_cache - self.virtual_caches[j])
+            self.stats["vp_evictions"][j] += len(self.virtual_caches[j] - v_cache)
+            self.virtual_caches[j] = copy(v_cache)
+
+# No data plane penalties, only virtual plane penalties
+class MVIP2Node(MVIPNode):
+    def decideCaching(self, object_id):
+        for j, cache in enumerate(self.caches):
+            if cache.isFull():
+                victim_id = min(cache.contents, key=lambda k: self.cache_scores[k])
+                if self.cache_scores[object_id] > self.cache_scores[victim_id]:
+                    yield self.env.process(cache.replaceObject(victim_id, object_id))
+                    object_id = victim_id
+            else:
+                cache.cacheObject(object_id)
+                return

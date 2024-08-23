@@ -130,6 +130,9 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
             "vipsbw",
             "vipsbw2",
             "mvip",
+            "mvip1",
+            "mvip2",
+            "mvip3",
         ]:
             match cache_pol:
                 case cache_pol if cache_pol in ["none", "vip"]:
@@ -166,6 +169,30 @@ def getNode(env, node_id, fwd_pol, cache_pol, **kwargs):
                     )
                 case "mvip":
                     return MVIPNode(
+                        env,
+                        node_id,
+                        kwargs["num_objects"],
+                        kwargs["pen_weight"],
+                        **kwargs["vip_args"],
+                    )
+                case "mvip1":
+                    return MVIP1Node(
+                        env,
+                        node_id,
+                        kwargs["num_objects"],
+                        kwargs["pen_weight"],
+                        **kwargs["vip_args"],
+                    )
+                case "mvip2":
+                    return MVIP2Node(
+                        env,
+                        node_id,
+                        kwargs["num_objects"],
+                        kwargs["pen_weight"],
+                        **kwargs["vip_args"],
+                    )
+                case "mvip3":
+                    return MVIP3Node(
                         env,
                         node_id,
                         kwargs["num_objects"],
